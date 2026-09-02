@@ -20,6 +20,7 @@ public:
     void setDocument(Document *doc);
     // Re-applies button tooltips in the current language.
     void retranslate();
+    void refreshIcons();
 
 signals:
     void layerSelected(int index);

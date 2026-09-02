@@ -57,7 +57,7 @@ public:
     // Re-reads canvas-related preferences (transparency checkerboard brightness).
     void reloadSettings();
     bool showRulers() const;
-    int rulerSize() const { return m_showRulers ? 20 : 0; }
+    int rulerSize() const;
 
 signals:
     void zoomChanged(double zoom);

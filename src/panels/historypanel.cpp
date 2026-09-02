@@ -1,5 +1,6 @@
 #include "historypanel.h"
 #include "../i18n.h"
+#include "../toolicons.h"
 #include "core/document.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -22,34 +23,36 @@ HistoryPanel::HistoryPanel(QWidget *parent) : QWidget(parent) {
     auto *bottomBar = new QHBoxLayout;
     bottomBar->setContentsMargins(0, 0, 0, 0);
     bottomBar->addStretch();
-    // Standard undo/redo glyphs — instantly recognisable and crisp at any size.
+    // Use the same painted icons as the main toolbar so baselines do not depend
+    // on which glyph a user's UI font happens to provide.
     const QString btnStyle =
-        "QToolButton { font-size: 18px; font-weight: bold; color: #4a84e0;"
+        "QToolButton {"
         " border: 1px solid palette(mid); border-radius: 4px; }"
-        "QToolButton:hover { background: rgba(74,132,224,0.18); border-color: #4a84e0; }"
-        "QToolButton:pressed { background: rgba(74,132,224,0.35); }";
-    auto *undoBtn = new QToolButton;
-    undoBtn->setText(QString::fromUtf8("↶"));
-    undoBtn->setFixedSize(30, 26);
-    undoBtn->setStyleSheet(btnStyle);
-    undoBtn->setToolTip(TR("Annuler (Ctrl+Z)"));
-    auto *redoBtn = new QToolButton;
-    redoBtn->setText(QString::fromUtf8("↷"));
-    redoBtn->setFixedSize(30, 26);
-    redoBtn->setStyleSheet(btnStyle);
-    redoBtn->setToolTip(TR("Rétablir (Ctrl+Y)"));
-    bottomBar->addWidget(undoBtn);
-    bottomBar->addWidget(redoBtn);
+        "QToolButton:hover { background: palette(alternate-base); border-color: palette(highlight); }"
+        "QToolButton:pressed { background: palette(highlight); }";
+    m_undoBtn = new QToolButton;
+    m_undoBtn->setFixedSize(30, 26);
+    m_undoBtn->setIconSize(QSize(16, 16));
+    m_undoBtn->setStyleSheet(btnStyle);
+    m_undoBtn->setToolTip(TR("Annuler (Ctrl+Z)"));
+    m_redoBtn = new QToolButton;
+    m_redoBtn->setFixedSize(30, 26);
+    m_redoBtn->setIconSize(QSize(16, 16));
+    m_redoBtn->setStyleSheet(btnStyle);
+    m_redoBtn->setToolTip(TR("Rétablir (Ctrl+Y)"));
+    refreshIcons();
+    bottomBar->addWidget(m_undoBtn);
+    bottomBar->addWidget(m_redoBtn);
     layout->addLayout(bottomBar);
 
     m_statusLabel = new QLabel;
-    m_statusLabel->setStyleSheet("font-size: 9px; color: #888;");
+    m_statusLabel->setStyleSheet("color: palette(mid);");
     m_statusLabel->setVisible(false);
 
-    connect(undoBtn, &QToolButton::clicked, this, [this]() {
+    connect(m_undoBtn, &QToolButton::clicked, this, [this]() {
         if (m_document) { m_document->history().undo(); }
     });
-    connect(redoBtn, &QToolButton::clicked, this, [this]() {
+    connect(m_redoBtn, &QToolButton::clicked, this, [this]() {
         if (m_document) { m_document->history().redo(); }
     });
 
@@ -60,6 +63,11 @@ HistoryPanel::HistoryPanel(QWidget *parent) : QWidget(parent) {
         m_document->history().goToIndex(m_historyList->row(item));
         m_navigating = false;
     });
+}
+
+void HistoryPanel::refreshIcons() {
+    if (m_undoBtn) m_undoBtn->setIcon(ToolIcons::undoAction());
+    if (m_redoBtn) m_redoBtn->setIcon(ToolIcons::redoAction());
 }
 
 void HistoryPanel::setDocument(Document *doc) {

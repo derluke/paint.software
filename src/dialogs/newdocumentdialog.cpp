@@ -68,7 +68,7 @@ NewDocumentDialog::NewDocumentDialog(QWidget *parent) : QDialog(parent) {
     bgLayout->addWidget(new QLabel(TR("Arrière-plan :")));
     m_colorBtn = new QPushButton;
     m_colorBtn->setFixedSize(80, 24);
-    m_colorBtn->setStyleSheet("background-color: white; border: 1px solid #aaa;");
+    m_colorBtn->setStyleSheet("background-color: white; border: 1px solid palette(mid);");
     bgLayout->addWidget(m_colorBtn);
     auto *colorLabel = new QLabel("Blanc");
     bgLayout->addWidget(colorLabel);
@@ -77,7 +77,7 @@ NewDocumentDialog::NewDocumentDialog(QWidget *parent) : QDialog(parent) {
 
     // Infos taille
     m_sizeInfoLabel = new QLabel;
-    m_sizeInfoLabel->setStyleSheet("color: #555; font-size: 11px;");
+    m_sizeInfoLabel->setStyleSheet("color: palette(mid);");
     m_sizeInfoLabel->setText(QString("%1 \u00d7 %2 pixels").arg(800).arg(600));
     layout->addWidget(m_sizeInfoLabel);
 
@@ -119,7 +119,7 @@ void NewDocumentDialog::onChooseColor() {
     QColor c = QColorDialog::getColor(m_bgColor, this, TR("Couleur d'arrière-plan"));
     if (c.isValid()) {
         m_bgColor = c;
-        m_colorBtn->setStyleSheet(QString("background-color: %1; border: 1px solid #aaa;").arg(c.name()));
+        m_colorBtn->setStyleSheet(QString("background-color: %1; border: 1px solid palette(mid);").arg(c.name()));
     }
 }
 

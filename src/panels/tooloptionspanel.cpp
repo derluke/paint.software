@@ -66,7 +66,6 @@ ToolOptionsPanel::ToolOptionsPanel(QWidget *parent) : QWidget(parent) {
 
     // --- Brush width ---
     m_brushSizeLabel = new QLabel(TR("Largeur :"));
-    m_brushSizeLabel->setStyleSheet("font-size: 11px;");
     layout->addWidget(m_brushSizeLabel);
     // Editable combo: type any size (decimals allowed) or pick a preset, like
     // Paint.NET. The presets march 1..2000 with widening steps.
@@ -113,7 +112,6 @@ ToolOptionsPanel::ToolOptionsPanel(QWidget *parent) : QWidget(parent) {
 
     // --- Opacity ---
     m_opacityLabel = new QLabel(TR("Opacité :"));
-    m_opacityLabel->setStyleSheet("font-size: 11px;");
     layout->addWidget(m_opacityLabel);
     m_opacitySpin = new QSpinBox;
     m_opacitySpin->setRange(1, 100);
@@ -128,7 +126,6 @@ ToolOptionsPanel::ToolOptionsPanel(QWidget *parent) : QWidget(parent) {
 
     // --- Fill mode (shapes) ---
     m_fillLabel = new QLabel(TR("Remplissage :"));
-    m_fillLabel->setStyleSheet("font-size: 11px;");
     layout->addWidget(m_fillLabel);
     m_fillCombo = new QComboBox;
     m_fillCombo->addItems({TR("Contour"), TR("Rempli"), TR("Contour + rempli")});
@@ -140,7 +137,6 @@ ToolOptionsPanel::ToolOptionsPanel(QWidget *parent) : QWidget(parent) {
 
     // --- Fill Style: solid colour + GDI+ hatch patterns (Paint.NET) ---
     m_fillStyleLabel = new QLabel(TR("Style de remplissage :"));
-    m_fillStyleLabel->setStyleSheet("font-size: 11px;");
     layout->addWidget(m_fillStyleLabel);
     m_fillStyleCombo = new QComboBox;
     for (int i = 0; i < Hatch::count(); ++i)
@@ -154,7 +150,6 @@ ToolOptionsPanel::ToolOptionsPanel(QWidget *parent) : QWidget(parent) {
 
     // --- Corner radius (rounded rectangle shape only) ---
     m_cornerLabel = new QLabel(TR("Coin :"));
-    m_cornerLabel->setStyleSheet("font-size: 11px;");
     layout->addWidget(m_cornerLabel);
     m_cornerSpin = new QSpinBox;
     m_cornerSpin->setRange(0, 200);
@@ -168,7 +163,6 @@ ToolOptionsPanel::ToolOptionsPanel(QWidget *parent) : QWidget(parent) {
 
     // --- Tool-specific variant (shape / gradient type / line style / flood mode) ---
     m_variantLabel = new QLabel(TR("Type :"));
-    m_variantLabel->setStyleSheet("font-size: 11px;");
     layout->addWidget(m_variantLabel);
     m_variantCombo = new QComboBox;
     m_variantCombo->setFixedHeight(20);
@@ -179,7 +173,6 @@ ToolOptionsPanel::ToolOptionsPanel(QWidget *parent) : QWidget(parent) {
 
     // --- Curve type (Line/Curve tool: Straight / Cubic Spline / Bézier) ---
     m_curveTypeLabel = new QLabel(TR("Courbe :"));
-    m_curveTypeLabel->setStyleSheet("font-size: 11px;");
     layout->addWidget(m_curveTypeLabel);
     m_curveTypeCombo = new QComboBox;
     // Order must match the LineTool::CurveType enum.
@@ -192,7 +185,6 @@ ToolOptionsPanel::ToolOptionsPanel(QWidget *parent) : QWidget(parent) {
 
     // --- Gradient repeat mode (Paint.NET: None / Repeat / Reflect) ---
     m_gradientRepeatLabel = new QLabel(TR("Répétition :"));
-    m_gradientRepeatLabel->setStyleSheet("font-size: 11px;");
     layout->addWidget(m_gradientRepeatLabel);
     m_gradientRepeatCombo = new QComboBox;
     m_gradientRepeatCombo->addItems({TR("Aucune"), TR("Répéter"), TR("Réfléchir")});
@@ -204,14 +196,12 @@ ToolOptionsPanel::ToolOptionsPanel(QWidget *parent) : QWidget(parent) {
 
     // --- Gradient transparency (alpha-only) mode ---
     m_gradientTransparencyCheck = new QCheckBox(TR("Transparence"));
-    m_gradientTransparencyCheck->setStyleSheet("font-size: 11px;");
     layout->addWidget(m_gradientTransparencyCheck);
     connect(m_gradientTransparencyCheck, &QCheckBox::toggled,
             this, &ToolOptionsPanel::onGradientTransparencyToggled);
 
     // --- Blend mode (brush-like tools) ---
     m_blendModeLabel = new QLabel(TR("Mode :"));
-    m_blendModeLabel->setStyleSheet("font-size: 11px;");
     layout->addWidget(m_blendModeLabel);
     m_blendModeCombo = new QComboBox;
     for (auto mode : Layer::allBlendModes())
@@ -224,7 +214,6 @@ ToolOptionsPanel::ToolOptionsPanel(QWidget *parent) : QWidget(parent) {
 
     // --- Sampling source (Fill / Magic Wand): Image vs Layer (Paint.NET) ---
     m_samplingLabel = new QLabel(TR("Échantillonnage :"));
-    m_samplingLabel->setStyleSheet("font-size: 11px;");
     layout->addWidget(m_samplingLabel);
     m_samplingCombo = new QComboBox;
     // Index 0 = Image (composite), 1 = Calque/Layer (active layer only).
@@ -237,7 +226,6 @@ ToolOptionsPanel::ToolOptionsPanel(QWidget *parent) : QWidget(parent) {
 
     // --- Recolor target (Paint.NET "Sampling"): clicked pixel vs secondary colour ---
     m_recolorTargetLabel = new QLabel(TR("Cible :"));
-    m_recolorTargetLabel->setStyleSheet("font-size: 11px;");
     layout->addWidget(m_recolorTargetLabel);
     m_recolorTargetCombo = new QComboBox;
     // Index 0 = clicked pixel (sampled), 1 = secondary colour (fixed).
@@ -257,7 +245,6 @@ ToolOptionsPanel::ToolOptionsPanel(QWidget *parent) : QWidget(parent) {
     connect(m_fontCombo, &QFontComboBox::currentFontChanged, this, &ToolOptionsPanel::onFontChanged);
 
     m_fontSizeLabel = new QLabel(TR("Taille :"));
-    m_fontSizeLabel->setStyleSheet("font-size: 11px;");
     layout->addWidget(m_fontSizeLabel);
     m_fontSizeSpin = new QSpinBox;
     m_fontSizeSpin->setRange(1, 500);
@@ -303,13 +290,11 @@ ToolOptionsPanel::ToolOptionsPanel(QWidget *parent) : QWidget(parent) {
 
     // --- Antialiasing ---
     m_antialiasCheck = new QCheckBox(TR("Anticrénelage"));
-    m_antialiasCheck->setStyleSheet("font-size: 11px;");
     m_antialiasCheck->setChecked(true);
     layout->addWidget(m_antialiasCheck);
     connect(m_antialiasCheck, &QCheckBox::toggled, this, &ToolOptionsPanel::onAntialiasToggled);
 
     m_pressureCheck = new QCheckBox(TR("Pression"));
-    m_pressureCheck->setStyleSheet("font-size: 11px;");
     m_pressureCheck->setChecked(true);
     m_pressureCheck->setToolTip(TR("Sensibilité à la pression du stylet (varie la taille du point)"));
     // Paint.NET puts the Pressure toggle right after Brush size (before Hardness).
@@ -331,7 +316,6 @@ QWidget *ToolOptionsPanel::makeSliderGroup(const QString &labelText, QLabel *&la
     l->setSpacing(3);
 
     label = new QLabel(labelText);
-    label->setStyleSheet("font-size: 11px;");
     l->addWidget(label);
 
     slider = new QSlider(Qt::Horizontal);
@@ -342,7 +326,6 @@ QWidget *ToolOptionsPanel::makeSliderGroup(const QString &labelText, QLabel *&la
     l->addWidget(slider);
 
     valueLabel = new QLabel;
-    valueLabel->setStyleSheet("font-size: 11px;");
     valueLabel->setFixedWidth(32);
     const bool percent = (max == 100);
     valueLabel->setText(percent ? QString("%1%").arg(value) : QString::number(value));

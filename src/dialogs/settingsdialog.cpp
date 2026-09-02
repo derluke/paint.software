@@ -64,7 +64,7 @@ QWidget *SettingsDialog::buildUserInterfacePage() {
 
     // Color Scheme: Default / Light / Dark, applied immediately.
     m_schemeCombo = new QComboBox;
-    m_schemeCombo->addItem(TR("Défaut (système)"), int(Theme::Scheme::Default));
+    m_schemeCombo->addItem(TR("Défaut (système / Omarchy)"), int(Theme::Scheme::Default));
     m_schemeCombo->addItem(TR("Clair"),            int(Theme::Scheme::Light));
     m_schemeCombo->addItem(TR("Sombre"),           int(Theme::Scheme::Dark));
     m_schemeCombo->setCurrentIndex(int(Theme::scheme()));
@@ -91,7 +91,7 @@ QWidget *SettingsDialog::buildUserInterfacePage() {
     layout->addLayout(form);
 
     auto *note = new QLabel(TR("Le changement de langue est appliqué immédiatement."));
-    note->setStyleSheet("color: #4a90d9;");
+    note->setStyleSheet("color: palette(link);");
     note->setWordWrap(true);
     layout->addWidget(note);
 

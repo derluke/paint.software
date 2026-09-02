@@ -13,14 +13,21 @@
 int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
     app.setApplicationName("paint.software");
+    app.setDesktopFileName(QStringLiteral("paint.software"));
     app.setApplicationVersion(QStringLiteral(PAINTSW_VERSION_STR));
     app.setOrganizationName("PaintDali");
-    app.setWindowIcon(QIcon(":/paintdali-logo.png"));
+    app.setOrganizationDomain(QStringLiteral("github.com/Univers4craft"));
+    app.setWindowIcon(QIcon::fromTheme(QStringLiteral("paint.software"),
+                                       QIcon(QStringLiteral(":/paintdali-logo.svg"))));
 
     // Restore the saved language / colour scheme before any UI is built.
     I18n::loadFromSettings();
     I18n::applyQtTranslations();
     Theme::loadFromSettings();
+    // The Omarchy font must be installed before any widget derives its own
+    // font. Applying it only from MainWindow::applyTheme() is too late for the
+    // first frame; a later theme change then appears to "fix" those controls.
+    Theme::applyToApplication();
 
     MainWindow window;
     window.show();

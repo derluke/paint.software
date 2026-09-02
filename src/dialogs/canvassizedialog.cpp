@@ -66,7 +66,7 @@ CanvasSizeDialog::CanvasSizeDialog(int currentWidth, int currentHeight, QWidget 
     // Info label
     auto *infoLabel = new QLabel(TR("Le nouvel espace sera rempli avec la couleur secondaire."));
     infoLabel->setWordWrap(true);
-    infoLabel->setStyleSheet("color: #555; font-size: 11px; font-style: italic;");
+    infoLabel->setStyleSheet("color: palette(mid); font-style: italic;");
     layout->addWidget(infoLabel);
 
     // Buttons

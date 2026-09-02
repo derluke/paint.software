@@ -115,7 +115,7 @@ ResizeDialog::ResizeDialog(int currentWidth, int currentHeight, int dpi, QWidget
 
     // -- New size info --
     m_newSizeLabel = new QLabel;
-    m_newSizeLabel->setStyleSheet("color: #555; font-style: italic;");
+    m_newSizeLabel->setStyleSheet("color: palette(mid); font-style: italic;");
     layout->addWidget(m_newSizeLabel);
     updateNewSizeLabel();
 

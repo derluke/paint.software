@@ -19,14 +19,13 @@
 namespace {
 // Neutral "ink" colour and layer-fill colour that adapt to the active theme so
 // the icons stay visible on both light and dark panels.
-static QColor inkColor()    { return Theme::isDark() ? QColor(210, 210, 210) : QColor(60, 60, 60); }
-static QColor layerFill1()  { return Theme::isDark() ? QColor(95, 105, 125)  : QColor(200, 210, 230); }
-static QColor layerFill2()  { return Theme::isDark() ? QColor(130, 140, 160) : QColor(230, 235, 245); }
-static QColor accentBlue()  { return Theme::isDark() ? QColor(90, 150, 235)  : QColor(50, 100, 200); }
+static QColor inkColor()    { return Theme::color(Theme::ColorRole::Foreground); }
+static QColor layerFill1()  { return Theme::color(Theme::ColorRole::Muted); }
+static QColor layerFill2()  { return Theme::color(Theme::ColorRole::Raised); }
+static QColor accentBlue()  { return Theme::color(Theme::ColorRole::Accent); }
 
 static QIcon makeLayerBtnIcon(const std::function<void(QPainter&)> &drawFunc) {
-    QPixmap pm(14, 14);
-    pm.fill(Qt::transparent);
+    QPixmap pm = Theme::iconCanvas(14);
     QPainter p(&pm);
     p.setRenderHint(QPainter::Antialiasing, true);
     drawFunc(p);
@@ -35,14 +34,14 @@ static QIcon makeLayerBtnIcon(const std::function<void(QPainter&)> &drawFunc) {
 }
 static QIcon addLayerIcon() {
     return makeLayerBtnIcon([](QPainter &p) {
-        p.setPen(QPen(QColor(70, 180, 70), 2));   // green reads on both themes
+        p.setPen(QPen(Theme::color(Theme::ColorRole::Success), 2));
         p.drawLine(7, 2, 7, 12);
         p.drawLine(2, 7, 12, 7);
     });
 }
 static QIcon removeLayerIcon() {
     return makeLayerBtnIcon([](QPainter &p) {
-        p.setPen(QPen(QColor(225, 80, 80), 2));    // red reads on both themes
+        p.setPen(QPen(Theme::color(Theme::ColorRole::Danger), 2));
         p.drawLine(2, 7, 12, 7);
     });
 }
@@ -211,6 +210,15 @@ LayersPanel::LayersPanel(QWidget *parent) : QWidget(parent) {
             [this]() { syncOrderFromList(); });
     connect(m_opacitySlider, &QSlider::valueChanged, this, &LayersPanel::onOpacityChanged);
     connect(m_blendModeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &LayersPanel::onBlendModeChanged);
+}
+
+void LayersPanel::refreshIcons() {
+    if (m_addBtn) m_addBtn->setIcon(addLayerIcon());
+    if (m_removeBtn) m_removeBtn->setIcon(removeLayerIcon());
+    if (m_duplicateBtn) m_duplicateBtn->setIcon(duplicateLayerIcon());
+    if (m_mergeBtn) m_mergeBtn->setIcon(mergeDownIcon());
+    if (m_moveUpBtn) m_moveUpBtn->setIcon(moveUpIcon());
+    if (m_moveDownBtn) m_moveDownBtn->setIcon(moveDownIcon());
 }
 
 void LayersPanel::setDocument(Document *doc) {

@@ -15,8 +15,10 @@
 #include <QComboBox>
 #include <QEvent>
 #include <QMenu>
+#include <QActionGroup>
 #include <QFileDialog>
 #include <QFile>
+#include <QSettings>
 #include <QTextStream>
 #include <cmath>
 
@@ -57,7 +59,7 @@ void ColorWheelWidget::paintEvent(QPaintEvent *) {
     painter.drawImage(0, 0, m_wheelImage);
 
     // Rim
-    painter.setPen(QPen(QColor(120, 120, 120), 1));
+    painter.setPen(QPen(Theme::color(Theme::ColorRole::Muted), 1));
     painter.setBrush(Qt::NoBrush);
     painter.drawEllipse(QPoint(cx, cy), m_wheelRadius, m_wheelRadius);
 
@@ -164,6 +166,7 @@ ColorsPanel::ColorsPanel(QWidget *parent) : QWidget(parent) {
     // Without this a plain QWidget subclass ignores the stylesheet's
     // background-color, so the panel stayed dark under the light scheme.
     setAttribute(Qt::WA_StyledBackground, true);
+    loadPaletteSettings();
 
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(4, 2, 4, 2);
@@ -201,7 +204,7 @@ ColorsPanel::ColorsPanel(QWidget *parent) : QWidget(parent) {
     // Secondary swatch: smaller, behind and offset
     m_secondarySwatch = new QLabel(swatchContainer);
     m_secondarySwatch->setGeometry(16, 16, 32, 32);
-    m_secondarySwatch->setStyleSheet("background-color: white; border: 2px solid #808080;");
+    m_secondarySwatch->setStyleSheet("background-color: white; border: 2px solid palette(mid);");
     m_secondarySwatch->setCursor(Qt::PointingHandCursor);
     m_secondarySwatch->installEventFilter(this);
     // Raise primary on top
@@ -250,7 +253,7 @@ ColorsPanel::ColorsPanel(QWidget *parent) : QWidget(parent) {
     sliderGrid->setSpacing(1);
     // RVB header
     auto *rvbHeader = new QLabel(TR("RVB"));
-    rvbHeader->setStyleSheet("font-weight: bold; font-size: 10px; color: #555;");
+    rvbHeader->setStyleSheet("font-weight: bold; color: palette(mid);");
     sliderGrid->addWidget(rvbHeader, 0, 0, 1, 3);
     auto makeSlider = [&](const QString &label, int row, QSlider *&slider, QSpinBox *&spin) {
         auto *lbl = new QLabel(label);
@@ -286,7 +289,7 @@ ColorsPanel::ColorsPanel(QWidget *parent) : QWidget(parent) {
 
     // HSV header label
     auto *hsvHeader = new QLabel(TR("TSV"));
-    hsvHeader->setStyleSheet("font-weight: bold; font-size: 10px; color: #555;");
+    hsvHeader->setStyleSheet("font-weight: bold; color: palette(mid);");
     hsvGrid->addWidget(hsvHeader, 0, 0, 1, 3);
 
     auto makeHsvSlider = [&](const QString &label, int row, int maxVal, QSlider *&slider, QSpinBox *&spin) {
@@ -499,12 +502,16 @@ void ColorsPanel::updateFromDocument() {
     QColor secondary = m_document->secondaryColor();
 
     // The active slot gets a bright outline; the inactive one a muted one.
+    const QString accentBorder = QStringLiteral("3px solid %1")
+        .arg(Theme::color(Theme::ColorRole::Accent).name());
+    const QString mutedBorder = QStringLiteral("2px solid %1")
+        .arg(Theme::color(Theme::ColorRole::Muted).name());
     m_primarySwatch->setStyleSheet(
         QString("background-color: %1; border: %2;")
-            .arg(primary.name(), m_editingPrimary ? "3px solid #4a90d9" : "2px solid gray"));
+            .arg(primary.name(), m_editingPrimary ? accentBorder : mutedBorder));
     m_secondarySwatch->setStyleSheet(
         QString("background-color: %1; border: %2;")
-            .arg(secondary.name(), m_editingPrimary ? "2px solid gray" : "3px solid #4a90d9"));
+            .arg(secondary.name(), m_editingPrimary ? mutedBorder : accentBorder));
     // Whichever slot is active is drawn in front.
     if (m_editingPrimary) m_primarySwatch->raise();
     else                  m_secondarySwatch->raise();
@@ -566,17 +573,17 @@ void ColorsPanel::updateHsvSliders(const QColor &color) {
 void ColorsPanel::refreshIcons() {
     // Both icons used to be drawn in a fixed dark grey — the same colour as the
     // dark scheme's panel, so they were invisible. Follow the active scheme.
-    const QColor fg = Theme::isDark() ? QColor(225, 225, 225) : QColor(60, 60, 60);
+    const QColor resetColor = Theme::color(Theme::ColorRole::Accent);
+    const QColor swapColor = Theme::color(Theme::ColorRole::Secondary);
 
     if (m_resetBtn) {
-        QPixmap pm(14, 14);
-        pm.fill(Qt::transparent);
+        QPixmap pm = Theme::iconCanvas(14);
         QPainter rp(&pm);
         rp.setRenderHint(QPainter::Antialiasing, true);
-        rp.setPen(QPen(fg, 1.5));
+        rp.setPen(QPen(resetColor, 1.5));
         rp.setBrush(Qt::NoBrush);
         rp.drawArc(QRect(2, 2, 10, 10), 45 * 16, 270 * 16);
-        rp.setBrush(fg);
+        rp.setBrush(resetColor);
         rp.setPen(Qt::NoPen);
         QPointF a[] = {QPointF(7, 1), QPointF(4, 3.5), QPointF(7, 6)};
         rp.drawPolygon(a, 3);
@@ -586,11 +593,10 @@ void ColorsPanel::refreshIcons() {
     }
 
     if (m_swapBtn) {
-        QPixmap pm(14, 14);
-        pm.fill(Qt::transparent);
+        QPixmap pm = Theme::iconCanvas(14);
         QPainter sp(&pm);
         sp.setRenderHint(QPainter::Antialiasing, true);
-        sp.setPen(QPen(fg, 1.3));
+        sp.setPen(QPen(swapColor, 1.3));
         sp.drawLine(3, 4, 11, 4);
         sp.drawLine(9, 2, 11, 4); sp.drawLine(9, 6, 11, 4);
         sp.drawLine(3, 10, 11, 10);
@@ -598,6 +604,17 @@ void ColorsPanel::refreshIcons() {
         sp.end();
         m_swapBtn->setIcon(QIcon(pm));
         m_swapBtn->setIconSize(QSize(14, 14));
+    }
+
+    // In theme mode the swatches are another part of the live Omarchy skin.
+    // Rebuild them alongside the painted icons whenever the desktop palette
+    // changes; classic and custom image colours deliberately remain untouched.
+    if (m_paletteSource == PaletteSource::Theme) {
+        const QVector<QColor> current = themePalette();
+        if (current != m_palette) {
+            m_palette = current;
+            rebuildSwatchGrid();
+        }
     }
 }
 
@@ -616,6 +633,37 @@ QVector<QColor> ColorsPanel::defaultPalette() {
         QColor(0x00,0x7F,0x46), QColor(0x00,0x7F,0x7F), QColor(0x00,0x4A,0x7F), QColor(0x00,0x13,0x7F),
         QColor(0x21,0x00,0x7F), QColor(0x57,0x00,0x7F), QColor(0x7F,0x00,0x6E), QColor(0x7F,0x00,0x37),
     };
+}
+
+// The current desktop palette, arranged like paint.net's two-row palette: the
+// exact semantic theme colours on top and useful darker paint shades beneath.
+// These are image colours, so they remain selectable even when the UI later
+// changes theme; theme mode refreshes the full set on each Omarchy update.
+QVector<QColor> ColorsPanel::themePalette() {
+    const QVector<Theme::ColorRole> roles = {
+        Theme::ColorRole::Background,
+        Theme::ColorRole::Surface,
+        Theme::ColorRole::Raised,
+        Theme::ColorRole::Selection,
+        Theme::ColorRole::Muted,
+        Theme::ColorRole::Foreground,
+        Theme::ColorRole::BrightForeground,
+        Theme::ColorRole::Danger,
+        Theme::ColorRole::Orange,
+        Theme::ColorRole::Warning,
+        Theme::ColorRole::Success,
+        Theme::ColorRole::Cyan,
+        Theme::ColorRole::Blue,
+        Theme::ColorRole::Purple,
+        Theme::ColorRole::Accent,
+        Theme::ColorRole::Secondary,
+    };
+
+    QVector<QColor> result;
+    result.reserve(roles.size() * 2);
+    for (Theme::ColorRole role : roles) result.append(Theme::color(role));
+    for (Theme::ColorRole role : roles) result.append(Theme::color(role).darker(145));
+    return result;
 }
 
 // Serialize the palette as one 8-digit uppercase AARRGGBB hex value per line,
@@ -653,7 +701,7 @@ QVector<QColor> ColorsPanel::paletteFromText(const QString &text) {
 }
 
 void ColorsPanel::createSwatches(QBoxLayout *parentLayout) {
-    m_palette = defaultPalette();
+    if (m_palette.isEmpty()) m_palette = defaultPalette();
 
     // Header row: the "+" (add current colour) and the palette management menu.
     auto *paletteHeader = new QHBoxLayout;
@@ -668,10 +716,25 @@ void ColorsPanel::createSwatches(QBoxLayout *parentLayout) {
     paletteHeader->addWidget(addBtn);
 
     auto *menuBtn = new QToolButton;
+    menuBtn->setObjectName(QStringLiteral("PaletteMenuButton"));
     menuBtn->setText(TR("Palette"));
-    menuBtn->setFixedHeight(20);
+    menuBtn->setMinimumHeight(Theme::scaledMetric(20));
     menuBtn->setPopupMode(QToolButton::InstantPopup);
     auto *menu = new QMenu(menuBtn);
+    auto *paletteGroup = new QActionGroup(menu);
+    paletteGroup->setExclusive(true);
+    paletteGroup->setExclusionPolicy(QActionGroup::ExclusionPolicy::ExclusiveOptional);
+    m_defaultPaletteAction = menu->addAction(TR("Palette Paint.NET"));
+    m_defaultPaletteAction->setCheckable(true);
+    paletteGroup->addAction(m_defaultPaletteAction);
+    connect(m_defaultPaletteAction, &QAction::triggered,
+            this, &ColorsPanel::useDefaultPalette);
+    m_themePaletteAction = menu->addAction(TR("Couleurs du thème actuel"));
+    m_themePaletteAction->setCheckable(true);
+    paletteGroup->addAction(m_themePaletteAction);
+    connect(m_themePaletteAction, &QAction::triggered,
+            this, &ColorsPanel::useThemePalette);
+    menu->addSeparator();
     menu->addAction(TR("Enregistrer la palette..."), this, &ColorsPanel::savePalette);
     menu->addAction(TR("Charger une palette..."), this, &ColorsPanel::openPalette);
     menu->addAction(TR("Réinitialiser la palette"), this, &ColorsPanel::resetPalette);
@@ -688,6 +751,7 @@ void ColorsPanel::createSwatches(QBoxLayout *parentLayout) {
     // the whole palette is silently invisible.
     parentLayout->addLayout(m_swatchGrid);
 
+    updatePaletteActions();
     rebuildSwatchGrid();
 }
 
@@ -714,7 +778,7 @@ void ColorsPanel::rebuildSwatchGrid() {
         // The stylesheet sizes the *content* box, so the 1px border and any
         // padding are added on top: state both, or each cell silently ends up
         // half again as wide as asked and the whole panel bloats.
-        btn->setStyleSheet(QString("QToolButton { background-color: %1; border: 1px solid #888;"
+        btn->setStyleSheet(QString("QToolButton { background-color: %1; border: 1px solid palette(mid);"
                                    " padding: 0px; margin: 0px;"
                                    " min-width: %2px; min-height: %2px;"
                                    " max-width: %2px; max-height: %2px; }")
@@ -739,6 +803,9 @@ void ColorsPanel::addCurrentColorToPalette() {
     else
         c = m_colorWheel->color();
     m_palette.append(c);
+    m_paletteSource = PaletteSource::Custom;
+    savePaletteSettings();
+    updatePaletteActions();
     rebuildSwatchGrid();
 }
 
@@ -764,12 +831,73 @@ void ColorsPanel::openPalette() {
     const QVector<QColor> parsed = paletteFromText(ts.readAll());
     if (parsed.isEmpty()) return;   // nothing usable — keep the current palette
     m_palette = parsed;
+    m_paletteSource = PaletteSource::Custom;
+    savePaletteSettings();
+    updatePaletteActions();
     rebuildSwatchGrid();
 }
 
 void ColorsPanel::resetPalette() {
-    m_palette = defaultPalette();
+    setPaletteSource(PaletteSource::Classic);
+}
+
+void ColorsPanel::useDefaultPalette() {
+    setPaletteSource(PaletteSource::Classic);
+}
+
+void ColorsPanel::useThemePalette() {
+    setPaletteSource(PaletteSource::Theme);
+}
+
+void ColorsPanel::setPaletteSource(PaletteSource source) {
+    m_paletteSource = source;
+    if (source == PaletteSource::Theme) m_palette = themePalette();
+    else if (source == PaletteSource::Classic) m_palette = defaultPalette();
+    savePaletteSettings();
+    updatePaletteActions();
     rebuildSwatchGrid();
+}
+
+void ColorsPanel::loadPaletteSettings() {
+    QSettings settings(QStringLiteral("PaintDali"), QStringLiteral("PaintDali"));
+    const QString source = settings.value(QStringLiteral("colors/paletteSource"),
+                                          QStringLiteral("classic")).toString();
+    if (source == QStringLiteral("theme")) {
+        m_paletteSource = PaletteSource::Theme;
+        m_palette = themePalette();
+    } else if (source == QStringLiteral("custom")) {
+        m_palette = paletteFromText(
+            settings.value(QStringLiteral("colors/customPalette")).toString());
+        if (m_palette.isEmpty()) {
+            m_paletteSource = PaletteSource::Classic;
+            m_palette = defaultPalette();
+        } else {
+            m_paletteSource = PaletteSource::Custom;
+        }
+    } else {
+        m_paletteSource = PaletteSource::Classic;
+        m_palette = defaultPalette();
+    }
+}
+
+void ColorsPanel::savePaletteSettings() {
+    QSettings settings(QStringLiteral("PaintDali"), QStringLiteral("PaintDali"));
+    const char *source = m_paletteSource == PaletteSource::Theme ? "theme"
+                       : m_paletteSource == PaletteSource::Custom ? "custom"
+                                                                 : "classic";
+    settings.setValue(QStringLiteral("colors/paletteSource"),
+                      QString::fromLatin1(source));
+    if (m_paletteSource == PaletteSource::Custom) {
+        settings.setValue(QStringLiteral("colors/customPalette"),
+                          paletteToText(m_palette));
+    }
+}
+
+void ColorsPanel::updatePaletteActions() {
+    if (m_defaultPaletteAction)
+        m_defaultPaletteAction->setChecked(m_paletteSource == PaletteSource::Classic);
+    if (m_themePaletteAction)
+        m_themePaletteAction->setChecked(m_paletteSource == PaletteSource::Theme);
 }
 
 void ColorsPanel::onSwatchRightClicked(const QColor &color) {

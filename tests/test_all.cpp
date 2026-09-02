@@ -20,6 +20,7 @@
 #include "canvas/canvaswidget.h"
 #include "i18n.h"
 #include "theme.h"
+#include "desktopintegration.h"
 
 #include "tools/brushtool.h"
 #include "tools/penciltool.h"
@@ -43,10 +44,12 @@
 #include <QImageWriter>
 #include <QImageReader>
 #include <QTemporaryFile>
+#include <QTemporaryDir>
 #include "dialogs/resizedialog.h"
 #include <QPushButton>
 #include <QComboBox>
 #include <QLineEdit>
+#include <QLocale>
 #include <QDoubleSpinBox>
 #include <QDockWidget>
 #include <QMainWindow>
@@ -689,6 +692,14 @@ int main(int argc, char **argv) {
         CHECK(I18n::t("&Fichier") == "&File", "English translates File menu");
         CHECK(I18n::t("Pinceau") == "Paintbrush", "English translates Paintbrush");
         CHECK(I18n::t("Sombre") == "Dark", "English translates Dark");
+        CHECK(I18n::t("Tous les formats pris en charge") == "All supported formats",
+              "English translates the native Open dialog filters");
+        CHECK(I18n::t("paint.software - conserve les calques")
+                  == "paint.software - preserves layers",
+              "English translates the native Save dialog filters");
+        I18n::applyQtTranslations();
+        CHECK(QLocale().language() == QLocale::English,
+              "English selection also controls Qt's dialog locale");
         CHECK(I18n::t("ZZ-unknown-ZZ") == "ZZ-unknown-ZZ", "Unknown string passes through");
         I18n::setLanguage(I18n::Lang::French);
     }
@@ -704,8 +715,154 @@ int main(int argc, char **argv) {
         CHECK(Theme::isDark(), "Dark scheme is dark");
         QString ds = Theme::styleSheet();
         CHECK(ds.contains("QMenuBar") && ds != ls, "Dark stylesheet differs from light");
+        CHECK(ds.contains("QToolButton#PaletteMenuButton")
+                  && ds.contains("padding-right: 22px"),
+              "palette dropdown reserves a separate menu-indicator gutter");
         CHECK(Theme::canvasBackdrop() != QString("#969696"), "Dark backdrop differs from light");
+
+        QTemporaryDir omarchyTheme;
+        CHECK(omarchyTheme.isValid(), "temporary Omarchy theme opens");
+        QFile omarchyColors(omarchyTheme.filePath("colors.toml"));
+        CHECK(omarchyColors.open(QIODevice::ReadWrite), "temporary Omarchy palette opens");
+        QFile omarchyShell(omarchyTheme.filePath("shell.toml"));
+        CHECK(omarchyShell.open(QIODevice::WriteOnly), "temporary Omarchy shell theme opens");
+        omarchyShell.write("[font]\nbase-size = 13\n");
+        omarchyShell.close();
+        const QByteArray paletteText =
+            "mode = \"dark\"\n"
+            "accent = \"#7aa2f7\"\n"
+            "selection = \"#292e42\"\n"
+            "muted = \"#414868\"\n"
+            "background = \"#1a1b26\"\n"
+            "dark_background = \"#13141c\"\n"
+            "darker_background = \"#0e0e14\"\n"
+            "lighter_background = \"#24283b\"\n"
+            "foreground = \"#a9b1d6\"\n"
+            "dark_foreground = \"#565f89\"\n"
+            "light_foreground = \"#b4bee6\"\n"
+            "bright_foreground = \"#c0caf5\"\n"
+            "red = \"#f7768e\"\n"
+            "orange = \"#ff9e64\"\n"
+            "yellow = \"#e0af68\"\n"
+            "green = \"#9ece6a\"\n"
+            "cyan = \"#7dcfff\"\n"
+            "blue = \"#7aa2f7\"\n"
+            "purple = \"#bb9af7\"\n"
+            "magenta = \"#ad8ee6\"\n";
+        omarchyColors.write(paletteText);
+        omarchyColors.flush();
+
+        const QByteArray oldPaletteOverride = qgetenv("PAINTSW_OMARCHY_COLORS");
+        qputenv("PAINTSW_OMARCHY_COLORS", omarchyColors.fileName().toUtf8());
+        Theme::reloadExternalPalette();
+        Theme::setScheme(Theme::Scheme::Default);
+        CHECK(Theme::usesOmarchyPalette(), "Default discovers an Omarchy colors.toml");
+        CHECK(Theme::isDark(), "Omarchy mode controls the effective scheme");
+        const QString os = Theme::styleSheet();
+        CHECK(os.contains("#7aa2f7") && os.contains("#1a1b26"),
+              "Omarchy accent and background reach the stylesheet");
+        CHECK(!os.contains("@accent@") && !os.contains("@background@"),
+              "all semantic stylesheet tokens are resolved");
+        CHECK(Theme::palette().color(QPalette::Highlight) == QColor("#7aa2f7"),
+              "native Qt palette uses the Omarchy accent");
+        CHECK(Theme::canvasBackdrop() == QString("#0e0e14"),
+              "canvas surround follows the Omarchy darker background");
+        const QVector<QColor> themeSwatches = ColorsPanel::themePalette();
+        CHECK(themeSwatches.size() == 32,
+              "theme palette has the same 32-swatch shape as Paint.NET");
+        CHECK(themeSwatches[0] == QColor("#1a1b26")
+                  && themeSwatches[8] == QColor("#ff9e64")
+                  && themeSwatches[13] == QColor("#bb9af7"),
+              "theme palette exposes Omarchy neutrals, orange, and purple");
+        CHECK(themeSwatches[16] == themeSwatches[0].darker(145),
+              "theme palette second row contains coordinated darker shades");
+        CHECK(Theme::uiFont().pixelSize() == 13,
+              "Omarchy shell base size reaches the application font");
+        CHECK(!Theme::uiFont().family().isEmpty(),
+              "the global Omarchy monospace selection resolves to a UI family");
+        Theme::applyToApplication();
+        QToolButton coldStartButton;
+        CHECK(QApplication::font().family() == Theme::uiFont().family(),
+              "startup application font is the resolved Omarchy family");
+        CHECK(coldStartButton.font().family() == Theme::uiFont().family(),
+              "widgets constructed after startup inherit the Omarchy family");
+
+        CHECK(Theme::setDesktopTextScale(1.5),
+              "desktop text scaling reports a changed value");
+        CHECK(Theme::uiFont().pixelSize() == 20,
+              "desktop text scale multiplies the theme base size");
+        CHECK(Theme::styleSheet().contains("font-size: 20px"),
+              "Omarchy widget metrics scale with the desktop text size");
+
+        QFile userShell(omarchyTheme.filePath("user-shell.toml"));
+        CHECK(userShell.open(QIODevice::WriteOnly),
+              "temporary Omarchy user shell override opens");
+        userShell.write("[font]\nbase-size = 17\n");
+        userShell.close();
+        const QByteArray oldUserShellOverride = qgetenv("PAINTSW_OMARCHY_USER_SHELL");
+        qputenv("PAINTSW_OMARCHY_USER_SHELL", userShell.fileName().toUtf8());
+        CHECK(Theme::reloadExternalPalette(), "user text-size override reloads");
+        CHECK(Theme::uiFont().pixelSize() == 17,
+              "Omarchy user text size overrides theme and portal scaling");
+        Theme::setDesktopTextScale(2.0);
+        CHECK(Theme::uiFont().pixelSize() == 17,
+              "portal scale is not applied twice to an Omarchy user override");
+        if (oldUserShellOverride.isNull()) qunsetenv("PAINTSW_OMARCHY_USER_SHELL");
+        else qputenv("PAINTSW_OMARCHY_USER_SHELL", oldUserShellOverride);
+        Theme::setDesktopTextScale(1.0);
+        Theme::reloadExternalPalette();
+
+        const QByteArray lightPaletteText =
+            "mode = \"light\"\n"
+            "accent = \"#1e66f5\"\n"
+            "selection = \"#ccd0da\"\n"
+            "muted = \"#acb0be\"\n"
+            "background = \"#eff1f5\"\n"
+            "dark_background = \"#e3e4e8\"\n"
+            "darker_background = \"#d7d8dc\"\n"
+            "lighter_background = \"#dce0e8\"\n"
+            "foreground = \"#4c4f69\"\n"
+            "dark_foreground = \"#9ca0b0\"\n"
+            "light_foreground = \"#5c5f77\"\n"
+            "bright_foreground = \"#4c4f69\"\n"
+            "red = \"#d20f39\"\n"
+            "blue = \"#1e66f5\"\n";
+        omarchyColors.resize(0);
+        omarchyColors.seek(0);
+        omarchyColors.write(lightPaletteText);
+        omarchyColors.flush();
+        CHECK(Theme::reloadExternalPalette(), "a changed Omarchy palette reloads");
+        CHECK(!Theme::isDark(), "Omarchy light mode is honoured");
+        CHECK(Theme::palette().color(QPalette::Window) == QColor("#eff1f5"),
+              "Omarchy light background reaches the native palette");
+
+        if (oldPaletteOverride.isNull()) qunsetenv("PAINTSW_OMARCHY_COLORS");
+        else qputenv("PAINTSW_OMARCHY_COLORS", oldPaletteOverride);
+        Theme::reloadExternalPalette();
         Theme::setScheme(Theme::Scheme::Light);
+    }
+
+    // ---------- DESKTOP INTEGRATION ----------
+    SECTION("Desktop integration");
+    {
+        CHECK(DesktopIntegration::isHyprlandSession("Hyprland", {}),
+              "Hyprland is detected from XDG_CURRENT_DESKTOP");
+        CHECK(DesktopIntegration::isHyprlandSession("GNOME:Hyprland", {}),
+              "Hyprland is detected in a desktop list");
+        CHECK(DesktopIntegration::isHyprlandSession("KDE", "instance_123"),
+              "Hyprland is detected from its instance signature");
+        CHECK(!DesktopIntegration::isHyprlandSession("GNOME", {}),
+              "other desktops keep the classic floating panels");
+
+        const QByteArray oldLayoutOverride = qgetenv("PAINTSW_UTILITY_LAYOUT");
+        qputenv("PAINTSW_UTILITY_LAYOUT", "docked");
+        CHECK(DesktopIntegration::prefersDockedUtilityWindows(),
+              "docked utility layout can be explicitly requested");
+        qputenv("PAINTSW_UTILITY_LAYOUT", "floating");
+        CHECK(!DesktopIntegration::prefersDockedUtilityWindows(),
+              "floating utility layout can be explicitly requested");
+        if (oldLayoutOverride.isNull()) qunsetenv("PAINTSW_UTILITY_LAYOUT");
+        else qputenv("PAINTSW_UTILITY_LAYOUT", oldLayoutOverride);
     }
 
     // ---------- DOCUMENT RESIZE / CROP ----------
