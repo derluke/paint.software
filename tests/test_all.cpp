@@ -780,6 +780,12 @@ int main(int argc, char **argv) {
               "Omarchy shell base size reaches the application font");
         CHECK(!Theme::uiFont().family().isEmpty(),
               "the global Omarchy monospace selection resolves to a UI family");
+        Theme::applyToApplication();
+        QToolButton coldStartButton;
+        CHECK(QApplication::font().family() == Theme::uiFont().family(),
+              "startup application font is the resolved Omarchy family");
+        CHECK(coldStartButton.font().family() == Theme::uiFont().family(),
+              "widgets constructed after startup inherit the Omarchy family");
 
         CHECK(Theme::setDesktopTextScale(1.5),
               "desktop text scaling reports a changed value");

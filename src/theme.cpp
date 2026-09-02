@@ -675,6 +675,12 @@ QString styleSheet() {
     return QString::fromUtf8(isDark() ? kDark : kLight);
 }
 
+void applyToApplication() {
+    qApp->setFont(uiFont());
+    qApp->setPalette(palette());
+    qApp->setStyleSheet(styleSheet());
+}
+
 QPalette palette() {
     if (usesOmarchyPalette()) return omarchyQtPalette();
     return fixedPalette(isDark());

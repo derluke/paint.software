@@ -741,9 +741,7 @@ void MainWindow::applyTheme() {
     // Application-wide, not just this window: file dialogs and other pop-ups are
     // separate top-level widgets, and with only the main window styled their item
     // views kept a white background under light text (issue #7).
-    qApp->setFont(Theme::uiFont());
-    qApp->setPalette(Theme::palette());
-    qApp->setStyleSheet(Theme::styleSheet());
+    Theme::applyToApplication();
 
     const int toolbarIcon = Theme::scaledMetric(16);
     const int toolIcon = Theme::scaledMetric(20);

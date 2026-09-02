@@ -40,6 +40,11 @@ bool isDark();
 // The full application stylesheet for the effective scheme.
 QString styleSheet();
 
+// Installs the resolved font, native palette, and stylesheet application-wide.
+// Call once before constructing widgets so controls that derive an explicit
+// bold/italic font inherit the Omarchy family rather than Qt's startup default.
+void applyToApplication();
+
 // Palette roles used by native dialogs and widgets that do not honour every
 // stylesheet rule.
 QPalette palette();

@@ -24,6 +24,10 @@ int main(int argc, char *argv[]) {
     I18n::loadFromSettings();
     I18n::applyQtTranslations();
     Theme::loadFromSettings();
+    // The Omarchy font must be installed before any widget derives its own
+    // font. Applying it only from MainWindow::applyTheme() is too late for the
+    // first frame; a later theme change then appears to "fix" those controls.
+    Theme::applyToApplication();
 
     MainWindow window;
     window.show();
