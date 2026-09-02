@@ -579,6 +579,7 @@ const QHash<QString, QString> &table() {
         {"Zoom avant", "Zoom In"},
         {"Zoom arrière", "Zoom Out"},
         {"Barre d'outils", "Toolbar"},
+        {"Options de l'outil", "Tool Options"},
 
         // ---- Plugins ----
         {"Plugins", "Plugins"},

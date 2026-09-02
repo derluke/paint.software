@@ -54,6 +54,7 @@
 #include <QDockWidget>
 #include <QMainWindow>
 #include <QKeyEvent>
+#include <QLayout>
 
 #include "effects/blureffect.h"
 #include "effects/sharpeneffect.h"
@@ -697,6 +698,8 @@ int main(int argc, char **argv) {
         CHECK(I18n::t("paint.software - conserve les calques")
                   == "paint.software - preserves layers",
               "English translates the native Save dialog filters");
+        CHECK(I18n::t("Options de l'outil") == "Tool Options",
+              "English translates the responsive toolbar title");
         I18n::applyQtTranslations();
         CHECK(QLocale().language() == QLocale::English,
               "English selection also controls Qt's dialog locale");
@@ -2355,6 +2358,63 @@ int main(int argc, char **argv) {
             CHECK(std::abs(brush.brushSize() - 12.5) < 1e-9,
                   "typing a decimal into the dropdown sets the tool's size");
         }
+    }
+
+    SECTION("Tool options bar adapts to a half-screen tile");
+    {
+        I18n::setLanguage(I18n::Lang::English);
+        BrushTool brush;
+        ToolOptionsPanel panel;
+        panel.setAttribute(Qt::WA_DontShowOnScreen);
+        panel.setTool(&brush);
+        panel.resize(1600, 26);
+        panel.show();
+        QCoreApplication::processEvents();
+        CHECK(!panel.isWrapped(), "wide toolbar keeps the familiar single row");
+
+        panel.resize(900, panel.height());
+        QCoreApplication::processEvents();
+        CHECK(panel.isWrapped(), "half-screen toolbar wraps instead of clipping controls");
+        CHECK(panel.height() >= 52, "wrapped toolbar provides a full second control row");
+
+        QWidget *primary = panel.findChild<QWidget *>("PrimaryOptionsRow");
+        QWidget *secondary = panel.findChild<QWidget *>("SecondaryOptionsRow");
+        CHECK(primary && secondary, "responsive toolbar exposes both layout rows");
+        if (primary && secondary) {
+            CHECK(secondary->geometry().top() >= primary->geometry().bottom(),
+                  "secondary controls are placed below the primary controls");
+            CHECK(secondary->layout()->minimumSize().width() <= secondary->width(),
+                  "all active secondary controls fit inside a 900 px tile");
+        }
+
+        FillTool fill;
+        GradientTool gradient;
+        RecolorTool recolor;
+        TextTool text;
+        LineTool line;
+        ShapeTool shape;
+        bool everyToolFits = true;
+        for (Tool *tool : {static_cast<Tool *>(&brush), static_cast<Tool *>(&fill),
+                           static_cast<Tool *>(&gradient), static_cast<Tool *>(&recolor),
+                           static_cast<Tool *>(&text), static_cast<Tool *>(&line),
+                           static_cast<Tool *>(&shape)}) {
+            panel.setTool(tool);
+            panel.resize(900, panel.height());
+            QCoreApplication::processEvents();
+            everyToolFits = everyToolFits && panel.isWrapped()
+                && primary && secondary
+                && primary->layout()->minimumSize().width() <= primary->width()
+                && secondary->layout()->minimumSize().width() <= secondary->width();
+        }
+        CHECK(everyToolFits,
+              "every option-heavy tool remains usable in a 900 px tile");
+
+        panel.setTool(&brush);
+        panel.resize(1600, panel.height());
+        QCoreApplication::processEvents();
+        CHECK(!panel.isWrapped() && panel.height() == 26,
+              "toolbar returns to one row after the window widens");
+        I18n::setLanguage(I18n::Lang::French);
     }
 
     SECTION("Line / Curve tool: draw, commit, cancel");

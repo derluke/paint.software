@@ -14,8 +14,11 @@
 #include <QLineEdit>
 #include <QDoubleValidator>
 
-#include <QHBoxLayout>
+#include <QBoxLayout>
 #include <QMouseEvent>
+#include <QResizeEvent>
+
+#include <algorithm>
 
 namespace {
 // The tool list shown in the dropdown, in paint.net's documented group order.
@@ -41,13 +44,50 @@ const ToolEntry kToolEntries[] = {
     {"Ligne / Courbe",                   ToolType::Line},
     {"Formes",                           ToolType::Shape},
 };
+
+constexpr int kOptionsRowHeight = 26;
+// Below this width a technically fitting row is still too cramped to scan or
+// operate comfortably, especially with Omarchy's larger global text sizes.
+constexpr int kComfortableSingleRowWidth = 1200;
 }
 
 ToolOptionsPanel::ToolOptionsPanel(QWidget *parent) : QWidget(parent) {
-    setFixedHeight(26);
-    auto *layout = new QHBoxLayout(this);
-    layout->setContentsMargins(3, 0, 3, 0);
-    layout->setSpacing(5);
+    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    setMinimumWidth(0);
+
+    // Keep the Paint.NET-style single row when there is room. Each row has its
+    // own horizontal layout so the root can turn vertical in a narrow tile.
+    m_rootLayout = new QBoxLayout(QBoxLayout::LeftToRight, this);
+    // Do not let the one-row size hint become the widget's hard minimum: the
+    // whole point of this layout is to accept a narrower toolbar and wrap.
+    m_rootLayout->setSizeConstraint(QLayout::SetNoConstraint);
+    m_rootLayout->setContentsMargins(3, 0, 3, 0);
+    m_rootLayout->setSpacing(5);
+
+    m_primaryRow = new QWidget(this);
+    m_primaryRow->setObjectName("PrimaryOptionsRow");
+    m_primaryRow->setFixedHeight(kOptionsRowHeight);
+    m_primaryRow->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
+    auto *primaryLayout = new QHBoxLayout(m_primaryRow);
+    primaryLayout->setContentsMargins(0, 0, 0, 0);
+    primaryLayout->setSpacing(5);
+
+    m_secondaryRow = new QWidget(this);
+    m_secondaryRow->setObjectName("SecondaryOptionsRow");
+    m_secondaryRow->setFixedHeight(kOptionsRowHeight);
+    m_secondaryRow->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
+    auto *secondaryLayout = new QHBoxLayout(m_secondaryRow);
+    secondaryLayout->setContentsMargins(0, 0, 0, 0);
+    secondaryLayout->setSpacing(5);
+    auto addSecondary = [this, secondaryLayout](QWidget *widget) {
+        secondaryLayout->addWidget(widget);
+        m_secondaryControls.append(widget);
+    };
+
+    m_rootLayout->addWidget(m_primaryRow);
+    m_rootLayout->addWidget(m_secondaryRow);
+    m_rootLayout->addStretch();
+    setFixedHeight(kOptionsRowHeight);
 
     // --- Tool selector dropdown (paint.net starts the row with this) ---
     m_toolCombo = new QComboBox;
@@ -56,17 +96,17 @@ ToolOptionsPanel::ToolOptionsPanel(QWidget *parent) : QWidget(parent) {
     m_toolCombo->setIconSize(QSize(16, 16));
     for (const auto &e : kToolEntries)
         m_toolCombo->addItem(ToolIcons::forTool(e.type), TR(QString::fromUtf8(e.name)));
-    layout->addWidget(m_toolCombo);
+    primaryLayout->addWidget(m_toolCombo);
     connect(m_toolCombo, QOverload<int>::of(&QComboBox::activated), this, [this](int i) {
         if (i >= 0 && i < int(sizeof(kToolEntries) / sizeof(kToolEntries[0])))
             emit toolChangeRequested(kToolEntries[i].type);
     });
 
-    layout->addWidget(createSep());
+    primaryLayout->addWidget(createSep());
 
     // --- Brush width ---
     m_brushSizeLabel = new QLabel(TR("Largeur :"));
-    layout->addWidget(m_brushSizeLabel);
+    primaryLayout->addWidget(m_brushSizeLabel);
     // Editable combo: type any size (decimals allowed) or pick a preset, like
     // Paint.NET. The presets march 1..2000 with widening steps.
     m_brushSizeCombo = new QComboBox;
@@ -84,7 +124,7 @@ ToolOptionsPanel::ToolOptionsPanel(QWidget *parent) : QWidget(parent) {
     m_brushSizeCombo->setFixedWidth(62);
     m_brushSizeCombo->setFixedHeight(20);
     m_brushSizeCombo->setToolTip(TR("Largeur du pinceau ( [ et ] pour ajuster )"));
-    layout->addWidget(m_brushSizeCombo);
+    primaryLayout->addWidget(m_brushSizeCombo);
     // Commit on Enter / focus-out and on picking a preset — not per keystroke,
     // so typing "6.5" isn't cut short (same reasoning as the resize dialog).
     connect(m_brushSizeCombo, QOverload<int>::of(&QComboBox::activated),
@@ -95,24 +135,24 @@ ToolOptionsPanel::ToolOptionsPanel(QWidget *parent) : QWidget(parent) {
     // --- Hardness ---
     m_hardnessGroup = makeSliderGroup(TR("Dureté :"), m_hardnessLabel, m_hardnessSlider,
                                       m_hardnessValue, 0, 100, 100);
-    layout->addWidget(m_hardnessGroup);
+    primaryLayout->addWidget(m_hardnessGroup);
     connect(m_hardnessSlider, &QSlider::valueChanged, this, &ToolOptionsPanel::onHardnessChanged);
 
     // --- Spacing ---
     m_spacingGroup = makeSliderGroup(TR("Espacement :"), m_spacingLabel, m_spacingSlider,
                                      m_spacingValue, 1, 100, 15);
-    layout->addWidget(m_spacingGroup);
+    primaryLayout->addWidget(m_spacingGroup);
     connect(m_spacingSlider, &QSlider::valueChanged, this, &ToolOptionsPanel::onSpacingChanged);
 
     // --- Tolerance ---
     m_toleranceGroup = makeSliderGroup(TR("Tolérance :"), m_toleranceLabel, m_toleranceSlider,
                                        m_toleranceValue, 0, 100, 50);
-    layout->addWidget(m_toleranceGroup);
+    primaryLayout->addWidget(m_toleranceGroup);
     connect(m_toleranceSlider, &QSlider::valueChanged, this, &ToolOptionsPanel::onToleranceChanged);
 
     // --- Opacity ---
     m_opacityLabel = new QLabel(TR("Opacité :"));
-    layout->addWidget(m_opacityLabel);
+    primaryLayout->addWidget(m_opacityLabel);
     m_opacitySpin = new QSpinBox;
     m_opacitySpin->setRange(1, 100);
     m_opacitySpin->setValue(100);
@@ -120,119 +160,119 @@ ToolOptionsPanel::ToolOptionsPanel(QWidget *parent) : QWidget(parent) {
     m_opacitySpin->setKeyboardTracking(false);   // commit on Enter/focus-out, not per digit
     m_opacitySpin->setFixedWidth(58);
     m_opacitySpin->setFixedHeight(20);
-    layout->addWidget(m_opacitySpin);
+    primaryLayout->addWidget(m_opacitySpin);
     connect(m_opacitySpin, QOverload<int>::of(&QSpinBox::valueChanged),
             this, &ToolOptionsPanel::onOpacityChanged);
 
     // --- Fill mode (shapes) ---
     m_fillLabel = new QLabel(TR("Remplissage :"));
-    layout->addWidget(m_fillLabel);
+    addSecondary(m_fillLabel);
     m_fillCombo = new QComboBox;
     m_fillCombo->addItems({TR("Contour"), TR("Rempli"), TR("Contour + rempli")});
     m_fillCombo->setFixedHeight(20);
     m_fillCombo->setFixedWidth(120);
-    layout->addWidget(m_fillCombo);
+    addSecondary(m_fillCombo);
     connect(m_fillCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &ToolOptionsPanel::onFillModeChanged);
 
     // --- Fill Style: solid colour + GDI+ hatch patterns (Paint.NET) ---
     m_fillStyleLabel = new QLabel(TR("Style de remplissage :"));
-    layout->addWidget(m_fillStyleLabel);
+    addSecondary(m_fillStyleLabel);
     m_fillStyleCombo = new QComboBox;
     for (int i = 0; i < Hatch::count(); ++i)
         m_fillStyleCombo->addItem(TR(Hatch::name(i)));
     m_fillStyleCombo->setFixedHeight(20);
     m_fillStyleCombo->setFixedWidth(150);
     m_fillStyleCombo->setToolTip(TR("Motif de remplissage"));
-    layout->addWidget(m_fillStyleCombo);
+    addSecondary(m_fillStyleCombo);
     connect(m_fillStyleCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &ToolOptionsPanel::onFillStyleChanged);
 
     // --- Corner radius (rounded rectangle shape only) ---
     m_cornerLabel = new QLabel(TR("Coin :"));
-    layout->addWidget(m_cornerLabel);
+    addSecondary(m_cornerLabel);
     m_cornerSpin = new QSpinBox;
     m_cornerSpin->setRange(0, 200);
     m_cornerSpin->setValue(10);
     m_cornerSpin->setKeyboardTracking(false);   // commit on Enter/focus-out, not per digit
     m_cornerSpin->setFixedWidth(52);
     m_cornerSpin->setFixedHeight(20);
-    layout->addWidget(m_cornerSpin);
+    addSecondary(m_cornerSpin);
     connect(m_cornerSpin, QOverload<int>::of(&QSpinBox::valueChanged),
             this, &ToolOptionsPanel::onCornerSizeChanged);
 
     // --- Tool-specific variant (shape / gradient type / line style / flood mode) ---
     m_variantLabel = new QLabel(TR("Type :"));
-    layout->addWidget(m_variantLabel);
+    addSecondary(m_variantLabel);
     m_variantCombo = new QComboBox;
     m_variantCombo->setFixedHeight(20);
     m_variantCombo->setFixedWidth(130);
-    layout->addWidget(m_variantCombo);
+    addSecondary(m_variantCombo);
     connect(m_variantCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &ToolOptionsPanel::onVariantChanged);
 
     // --- Curve type (Line/Curve tool: Straight / Cubic Spline / Bézier) ---
     m_curveTypeLabel = new QLabel(TR("Courbe :"));
-    layout->addWidget(m_curveTypeLabel);
+    addSecondary(m_curveTypeLabel);
     m_curveTypeCombo = new QComboBox;
     // Order must match the LineTool::CurveType enum.
     m_curveTypeCombo->addItems({TR("Ligne droite"), TR("Spline"), TR("Bézier")});
     m_curveTypeCombo->setFixedHeight(20);
     m_curveTypeCombo->setFixedWidth(90);
-    layout->addWidget(m_curveTypeCombo);
+    addSecondary(m_curveTypeCombo);
     connect(m_curveTypeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &ToolOptionsPanel::onCurveTypeChanged);
 
     // --- Gradient repeat mode (Paint.NET: None / Repeat / Reflect) ---
     m_gradientRepeatLabel = new QLabel(TR("Répétition :"));
-    layout->addWidget(m_gradientRepeatLabel);
+    addSecondary(m_gradientRepeatLabel);
     m_gradientRepeatCombo = new QComboBox;
     m_gradientRepeatCombo->addItems({TR("Aucune"), TR("Répéter"), TR("Réfléchir")});
     m_gradientRepeatCombo->setFixedHeight(20);
     m_gradientRepeatCombo->setFixedWidth(100);
-    layout->addWidget(m_gradientRepeatCombo);
+    addSecondary(m_gradientRepeatCombo);
     connect(m_gradientRepeatCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &ToolOptionsPanel::onGradientRepeatChanged);
 
     // --- Gradient transparency (alpha-only) mode ---
     m_gradientTransparencyCheck = new QCheckBox(TR("Transparence"));
-    layout->addWidget(m_gradientTransparencyCheck);
+    addSecondary(m_gradientTransparencyCheck);
     connect(m_gradientTransparencyCheck, &QCheckBox::toggled,
             this, &ToolOptionsPanel::onGradientTransparencyToggled);
 
     // --- Blend mode (brush-like tools) ---
     m_blendModeLabel = new QLabel(TR("Mode :"));
-    layout->addWidget(m_blendModeLabel);
+    addSecondary(m_blendModeLabel);
     m_blendModeCombo = new QComboBox;
     for (auto mode : Layer::allBlendModes())
         m_blendModeCombo->addItem(Layer::blendModeName(mode));
     m_blendModeCombo->setFixedHeight(20);
     m_blendModeCombo->setFixedWidth(100);
-    layout->addWidget(m_blendModeCombo);
+    addSecondary(m_blendModeCombo);
     connect(m_blendModeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &ToolOptionsPanel::onBlendModeChanged);
 
     // --- Sampling source (Fill / Magic Wand): Image vs Layer (Paint.NET) ---
     m_samplingLabel = new QLabel(TR("Échantillonnage :"));
-    layout->addWidget(m_samplingLabel);
+    addSecondary(m_samplingLabel);
     m_samplingCombo = new QComboBox;
     // Index 0 = Image (composite), 1 = Calque/Layer (active layer only).
     m_samplingCombo->addItems({TR("Image"), TR("Calque")});
     m_samplingCombo->setFixedHeight(20);
     m_samplingCombo->setFixedWidth(90);
-    layout->addWidget(m_samplingCombo);
+    addSecondary(m_samplingCombo);
     connect(m_samplingCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &ToolOptionsPanel::onSamplingChanged);
 
     // --- Recolor target (Paint.NET "Sampling"): clicked pixel vs secondary colour ---
     m_recolorTargetLabel = new QLabel(TR("Cible :"));
-    layout->addWidget(m_recolorTargetLabel);
+    addSecondary(m_recolorTargetLabel);
     m_recolorTargetCombo = new QComboBox;
     // Index 0 = clicked pixel (sampled), 1 = secondary colour (fixed).
     m_recolorTargetCombo->addItems({TR("Pixel cliqué"), TR("Couleur secondaire")});
     m_recolorTargetCombo->setFixedHeight(20);
     m_recolorTargetCombo->setFixedWidth(140);
-    layout->addWidget(m_recolorTargetCombo);
+    addSecondary(m_recolorTargetCombo);
     connect(m_recolorTargetCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &ToolOptionsPanel::onRecolorTargetChanged);
 
@@ -241,18 +281,18 @@ ToolOptionsPanel::ToolOptionsPanel(QWidget *parent) : QWidget(parent) {
     m_fontCombo->setFixedHeight(20);
     m_fontCombo->setFixedWidth(150);
     m_fontCombo->setToolTip(TR("Police"));
-    layout->addWidget(m_fontCombo);
+    addSecondary(m_fontCombo);
     connect(m_fontCombo, &QFontComboBox::currentFontChanged, this, &ToolOptionsPanel::onFontChanged);
 
     m_fontSizeLabel = new QLabel(TR("Taille :"));
-    layout->addWidget(m_fontSizeLabel);
+    addSecondary(m_fontSizeLabel);
     m_fontSizeSpin = new QSpinBox;
     m_fontSizeSpin->setRange(1, 500);
     m_fontSizeSpin->setValue(24);
     m_fontSizeSpin->setKeyboardTracking(false);   // commit on Enter/focus-out, not per digit
     m_fontSizeSpin->setFixedWidth(52);
     m_fontSizeSpin->setFixedHeight(20);
-    layout->addWidget(m_fontSizeSpin);
+    addSecondary(m_fontSizeSpin);
     connect(m_fontSizeSpin, QOverload<int>::of(&QSpinBox::valueChanged),
             this, &ToolOptionsPanel::onFontSizeChanged);
 
@@ -275,33 +315,96 @@ ToolOptionsPanel::ToolOptionsPanel(QWidget *parent) : QWidget(parent) {
     m_underlineBtn = makeStyleButton("U", TR("Souligné"), false, true);
     m_strikeBtn = makeStyleButton("S", TR("Barré"), false, false);
     { QFont f = m_strikeBtn->font(); f.setStrikeOut(true); m_strikeBtn->setFont(f); }
-    layout->addWidget(m_boldBtn);
-    layout->addWidget(m_italicBtn);
-    layout->addWidget(m_underlineBtn);
-    layout->addWidget(m_strikeBtn);
+    addSecondary(m_boldBtn);
+    addSecondary(m_italicBtn);
+    addSecondary(m_underlineBtn);
+    addSecondary(m_strikeBtn);
 
     m_alignCombo = new QComboBox;
     m_alignCombo->addItems({TR("Gauche"), TR("Centré"), TR("Droite")});
     m_alignCombo->setFixedHeight(20);
     m_alignCombo->setToolTip(TR("Alignement du texte"));
-    layout->addWidget(m_alignCombo);
+    addSecondary(m_alignCombo);
     connect(m_alignCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &ToolOptionsPanel::onTextStyleChanged);
 
     // --- Antialiasing ---
     m_antialiasCheck = new QCheckBox(TR("Anticrénelage"));
     m_antialiasCheck->setChecked(true);
-    layout->addWidget(m_antialiasCheck);
+    addSecondary(m_antialiasCheck);
     connect(m_antialiasCheck, &QCheckBox::toggled, this, &ToolOptionsPanel::onAntialiasToggled);
 
     m_pressureCheck = new QCheckBox(TR("Pression"));
     m_pressureCheck->setChecked(true);
     m_pressureCheck->setToolTip(TR("Sensibilité à la pression du stylet (varie la taille du point)"));
     // Paint.NET puts the Pressure toggle right after Brush size (before Hardness).
-    layout->insertWidget(layout->indexOf(m_brushSizeCombo) + 1, m_pressureCheck);
+    primaryLayout->insertWidget(primaryLayout->indexOf(m_brushSizeCombo) + 1, m_pressureCheck);
     connect(m_pressureCheck, &QCheckBox::toggled, this, &ToolOptionsPanel::onPressureToggled);
 
-    layout->addStretch();
+    primaryLayout->addStretch();
+    secondaryLayout->addStretch();
+    updateResponsiveLayout();
+}
+
+QSize ToolOptionsPanel::sizeHint() const {
+    const int primaryWidth = m_primaryRow ? m_primaryRow->sizeHint().width() : 0;
+    const bool hasSecondary = m_secondaryRow && !m_secondaryRow->isHidden();
+    const int secondaryWidth = hasSecondary ? m_secondaryRow->sizeHint().width() : 0;
+    const int preferredWidth = m_wrapped
+        ? qMax(primaryWidth, secondaryWidth)
+        : primaryWidth + (hasSecondary ? m_rootLayout->spacing() + secondaryWidth : 0);
+    return QSize(preferredWidth + 6,
+                 (m_wrapped && hasSecondary ? 2 : 1) * kOptionsRowHeight);
+}
+
+QSize ToolOptionsPanel::minimumSizeHint() const {
+    // The toolbar must be allowed to shrink to the width of a Hyprland tile;
+    // updateResponsiveLayout() supplies the extra row at that point.
+    return QSize(0, (m_wrapped && m_secondaryRow && !m_secondaryRow->isHidden() ? 2 : 1)
+                        * kOptionsRowHeight);
+}
+
+void ToolOptionsPanel::resizeEvent(QResizeEvent *event) {
+    QWidget::resizeEvent(event);
+    updateResponsiveLayout();
+}
+
+void ToolOptionsPanel::updateResponsiveLayout() {
+    if (!m_rootLayout || !m_primaryRow || !m_secondaryRow) return;
+
+    const bool hasSecondary = std::any_of(m_secondaryControls.cbegin(),
+                                          m_secondaryControls.cend(),
+                                          [](const QWidget *widget) {
+                                              return widget && !widget->isHidden();
+                                          });
+    m_secondaryRow->setVisible(hasSecondary);
+
+    if (m_primaryRow->layout()) {
+        m_primaryRow->layout()->invalidate();
+        m_primaryRow->layout()->activate();
+    }
+    if (m_secondaryRow->layout()) {
+        m_secondaryRow->layout()->invalidate();
+        m_secondaryRow->layout()->activate();
+    }
+
+    const QMargins margins = m_rootLayout->contentsMargins();
+    const int requiredWidth = m_primaryRow->sizeHint().width()
+        + (hasSecondary ? 5 + m_secondaryRow->sizeHint().width() : 0)
+        + margins.left() + margins.right();
+    const int wrapBelow = qMax(requiredWidth, kComfortableSingleRowWidth);
+    const bool shouldWrap = hasSecondary && width() > 0 && width() < wrapBelow;
+
+    if (m_wrapped != shouldWrap) {
+        m_wrapped = shouldWrap;
+        m_rootLayout->setDirection(m_wrapped ? QBoxLayout::TopToBottom
+                                             : QBoxLayout::LeftToRight);
+        m_rootLayout->setSpacing(m_wrapped ? 0 : 5);
+    }
+
+    const int wantedHeight = (m_wrapped && hasSecondary ? 2 : 1) * kOptionsRowHeight;
+    if (height() != wantedHeight) setFixedHeight(wantedHeight);
+    updateGeometry();
 }
 
 QWidget *ToolOptionsPanel::makeSliderGroup(const QString &labelText, QLabel *&label,
@@ -537,6 +640,7 @@ void ToolOptionsPanel::updateFromTool() {
     m_antialiasCheck->setVisible(hasAA);
     // Shown only when a tablet has been detected (Paint.NET), on brush-like tools.
     m_pressureCheck->setVisible(isBrushLike && m_tabletPresent);
+    updateResponsiveLayout();
 }
 
 void ToolOptionsPanel::onBrushSizeChanged() {
@@ -667,6 +771,7 @@ void ToolOptionsPanel::onVariantChanged(int index) {
         wand->setGlobal(index == 1);
     else if (auto *fill = dynamic_cast<FillTool*>(m_tool))
         fill->setGlobal(index == 1);
+    updateResponsiveLayout();
     emit toolOptionsChanged();
 }
 
@@ -822,4 +927,5 @@ void ToolOptionsPanel::retranslate() {
         m_toolCombo->addItem(ToolIcons::forTool(e.type), TR(QString::fromUtf8(e.name)));
     m_toolCombo->setCurrentIndex(cur);
     m_toolCombo->blockSignals(false);
+    updateResponsiveLayout();
 }

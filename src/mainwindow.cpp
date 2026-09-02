@@ -917,9 +917,12 @@ void MainWindow::retranslateUi() {
     createMenus();          // also re-creates the corner icons
 
     if (m_fixedToolbar) {
+        m_fixedToolbar->setWindowTitle(TR("Barre d'outils"));
         m_fixedToolbar->clear();
         populateFixedToolbar();
     }
+    if (m_variableToolbar)
+        m_variableToolbar->setWindowTitle(TR("Options de l'outil"));
     if (m_toolOptionsPanel) m_toolOptionsPanel->retranslate();
     if (m_layersPanel) m_layersPanel->retranslate();
 
@@ -1604,9 +1607,10 @@ void MainWindow::createDockPanels() {
             this, &MainWindow::selectTool);
     connect(m_toolOptionsPanel, &ToolOptionsPanel::toolOptionsChanged,
             this, [this]() { if (m_canvas) m_canvas->update(); });
-    auto *optionsBar = new QToolBar("Barre d'outils variable", this);
+    auto *optionsBar = new QToolBar(TR("Options de l'outil"), this);
     optionsBar->setObjectName("VariableToolbar");
     optionsBar->setMovable(false);
+    optionsBar->setFloatable(false);
     optionsBar->setIconSize(QSize(14, 14));
     optionsBar->addWidget(m_toolOptionsPanel);
     addToolBar(Qt::TopToolBarArea, optionsBar);

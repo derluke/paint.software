@@ -10,6 +10,7 @@
 #include <QLabel>
 #include <QFrame>
 #include <QEvent>
+#include <QVector>
 
 #include "tools/tool.h"
 
@@ -28,6 +29,12 @@ public:
     void setTabletPresent(bool present);
     // Re-applies all visible labels in the current language.
     void retranslate();
+    // Narrow Hyprland tiles wrap the less frequently used controls onto a
+    // second row instead of clipping the right-hand half of the toolbar.
+    bool isWrapped() const { return m_wrapped; }
+
+    QSize sizeHint() const override;
+    QSize minimumSizeHint() const override;
 
 signals:
     void toolOptionsChanged();
@@ -62,11 +69,17 @@ private slots:
 
 private:
     void updateFromTool();
+    void updateResponsiveLayout();
     void populateVariantCombo();
     QWidget *createSep();
     // A labelled slider with a live percentage readout.
     QWidget *makeSliderGroup(const QString &labelText, QLabel *&label, QSlider *&slider,
                              QLabel *&valueLabel, int min, int max, int value);
+
+protected:
+    void resizeEvent(class QResizeEvent *event) override;
+
+private:
 
     Tool *m_tool = nullptr;
 
@@ -139,4 +152,10 @@ private:
     QToolButton *m_underlineBtn;
     QToolButton *m_strikeBtn;
     class QComboBox *m_alignCombo;   // Left / Center / Right
+
+    class QBoxLayout *m_rootLayout = nullptr;
+    QWidget *m_primaryRow = nullptr;
+    QWidget *m_secondaryRow = nullptr;
+    QVector<QWidget *> m_secondaryControls;
+    bool m_wrapped = false;
 };
