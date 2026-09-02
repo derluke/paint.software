@@ -44,10 +44,12 @@ struct OmarchyPalette {
     QColor lightForeground;
     QColor brightForeground;
     QColor red;
+    QColor orange;
     QColor yellow;
     QColor green;
     QColor cyan;
     QColor blue;
+    QColor purple;
     QColor magenta;
 };
 
@@ -67,8 +69,9 @@ bool samePalette(const OmarchyPalette &a, const OmarchyPalette &b) {
         && a.darkForeground == b.darkForeground
         && a.lightForeground == b.lightForeground
         && a.brightForeground == b.brightForeground
-        && a.red == b.red && a.yellow == b.yellow && a.green == b.green
-        && a.cyan == b.cyan && a.blue == b.blue && a.magenta == b.magenta;
+        && a.red == b.red && a.orange == b.orange && a.yellow == b.yellow
+        && a.green == b.green && a.cyan == b.cyan && a.blue == b.blue
+        && a.purple == b.purple && a.magenta == b.magenta;
 }
 
 QString colorName(const QColor &color) {
@@ -487,10 +490,12 @@ OmarchyPalette readOmarchyPalette(const QString &path) {
     };
     result.red = optionalColor(QStringLiteral("red"), QColor(QStringLiteral("#d75f5f")));
     result.yellow = optionalColor(QStringLiteral("yellow"), result.accent);
+    result.orange = optionalColor(QStringLiteral("orange"), result.yellow);
     result.green = optionalColor(QStringLiteral("green"), result.accent);
     result.cyan = optionalColor(QStringLiteral("cyan"), result.accent);
     result.blue = optionalColor(QStringLiteral("blue"), result.accent);
     result.magenta = optionalColor(QStringLiteral("magenta"), result.accent);
+    result.purple = optionalColor(QStringLiteral("purple"), result.magenta);
 
     // Theme shell.toml supplies the default type rhythm. `omarchy display text
     // size` writes a machine-level override to ~/.config/omarchy/shell.toml;
@@ -695,10 +700,12 @@ QColor color(ColorRole role) {
         case ColorRole::Surface:          return g_omarchy.darkBackground;
         case ColorRole::Raised:           return g_omarchy.lighterBackground;
         case ColorRole::Danger:           return g_omarchy.red;
+        case ColorRole::Orange:           return g_omarchy.orange;
         case ColorRole::Success:          return g_omarchy.green;
         case ColorRole::Warning:          return g_omarchy.yellow;
         case ColorRole::Cyan:             return g_omarchy.cyan;
         case ColorRole::Blue:             return g_omarchy.blue;
+        case ColorRole::Purple:           return g_omarchy.purple;
         case ColorRole::Secondary:        return g_omarchy.magenta;
         }
     }
@@ -715,10 +722,12 @@ QColor color(ColorRole role) {
     case ColorRole::Surface:          return QColor(dark ? "#1e1e1e" : "#ffffff");
     case ColorRole::Raised:           return QColor(dark ? "#333333" : "#f7f7f7");
     case ColorRole::Danger:           return QColor(dark ? "#f7768e" : "#d20f39");
+    case ColorRole::Orange:           return QColor(dark ? "#ff9e64" : "#fe640b");
     case ColorRole::Success:          return QColor(dark ? "#9ece6a" : "#40a02b");
     case ColorRole::Warning:          return QColor(dark ? "#e0af68" : "#df8e1d");
     case ColorRole::Cyan:             return QColor(dark ? "#7dcfff" : "#179299");
     case ColorRole::Blue:             return QColor(dark ? "#7aa2f7" : "#1e66f5");
+    case ColorRole::Purple:           return QColor(dark ? "#bb9af7" : "#7287fd");
     case ColorRole::Secondary:        return QColor(dark ? "#ad8ee6" : "#8839ef");
     }
     return QColor();

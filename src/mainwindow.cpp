@@ -1906,10 +1906,15 @@ void MainWindow::newDocument() {
 }
 
 void MainWindow::openDocument() {
+    const QString filters = QStringLiteral(
+        "%1 (*.psw *.png *.jpg *.jpeg *.bmp *.gif *.tiff *.webp);;"
+        "%2 (*.psw);;Images (*.png *.jpg *.jpeg *.bmp *.gif *.tiff *.webp);;"
+        "%3 (*)")
+        .arg(TR("Tous les formats pris en charge"),
+             TR("paint.software (calques)"),
+             TR("Tous les fichiers"));
     QStringList files = QFileDialog::getOpenFileNames(this, TR("Ouvrir une image"),
-        QString(), "Tous les formats pris en charge (*.psw *.png *.jpg *.jpeg *.bmp *.gif *.tiff *.webp);;"
-                   "paint.software (calques) (*.psw);;"
-                   "Images (*.png *.jpg *.jpeg *.bmp *.gif *.tiff *.webp);;All Files (*)");
+        QString(), filters);
     for (const QString &f : files)
         loadDocumentInto(f);
 }
@@ -2067,9 +2072,13 @@ bool MainWindow::saveDocument() {
 
 bool MainWindow::saveDocumentAs() {
     QString selectedFilter;
+    const QString filters = QStringLiteral(
+        "%1 (*.psw);;PNG (*.png);;JPEG (*.jpg *.jpeg);;BMP (*.bmp);;"
+        "TIFF (*.tiff);;WebP (*.webp);;%2 (*)")
+        .arg(TR("paint.software - conserve les calques"),
+             TR("Tous les fichiers"));
     QString filePath = QFileDialog::getSaveFileName(this, TR("Enregistrer l'image"),
-        QString(), "paint.software - garde les calques (*.psw);;PNG (*.png);;JPEG (*.jpg *.jpeg);;"
-                   "BMP (*.bmp);;TIFF (*.tiff);;WebP (*.webp);;All Files (*)",
+        QString(), filters,
         &selectedFilter);
     if (filePath.isEmpty()) return false;
 

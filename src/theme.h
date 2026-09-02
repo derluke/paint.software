@@ -22,10 +22,12 @@ enum class ColorRole {
     Surface,
     Raised,
     Danger,
+    Orange,
     Success,
     Warning,
     Cyan,
     Blue,
+    Purple,
     Secondary,
 };
 

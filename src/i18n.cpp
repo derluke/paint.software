@@ -5,6 +5,7 @@
 #include <QTranslator>
 #include <QCoreApplication>
 #include <QLibraryInfo>
+#include <QLocale>
 
 namespace {
 
@@ -36,6 +37,10 @@ const QHash<QString, QString> &table() {
         {"Im&primer...", "&Print..."},
         {"&Fermer l'image", "&Close image"},
         {"&Quitter", "E&xit"},
+        {"Tous les formats pris en charge", "All supported formats"},
+        {"paint.software (calques)", "paint.software (layers)"},
+        {"paint.software - conserve les calques", "paint.software - preserves layers"},
+        {"Tous les fichiers", "All files"},
 
         // ---- Edit menu ----
         {"&Annuler", "&Undo"},
@@ -691,6 +696,8 @@ const QHash<QString, QString> &table() {
         {"Enregistrer la palette...", "Save Palette..."},
         {"Charger une palette...", "Open Palette..."},
         {"Réinitialiser la palette", "Reset Palette"},
+        {"Palette Paint.NET", "Paint.NET palette"},
+        {"Couleurs du thème actuel", "Current theme colours"},
         {"Palettes (*.txt);;Tous les fichiers (*)", "Palettes (*.txt);;All files (*)"},
 
         // ---- Messages ----
@@ -714,6 +721,9 @@ void applyQtTranslations() {
     // only French needs a catalogue loaded — and it is removed again on the way
     // back so a switch to English takes effect without a restart.
     static QTranslator *qtTranslator = nullptr;
+    QLocale::setDefault(g_lang == Lang::French
+                            ? QLocale(QLocale::French, QLocale::France)
+                            : QLocale(QLocale::English, QLocale::UnitedKingdom));
     if (qtTranslator) {
         QCoreApplication::removeTranslator(qtTranslator);
         delete qtTranslator;

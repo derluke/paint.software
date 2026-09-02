@@ -10,6 +10,7 @@
 #include <QVector>
 
 class Document;
+class QAction;
 
 class ColorWheelWidget : public QWidget {
     Q_OBJECT
@@ -70,6 +71,7 @@ public:
     static QString paletteToText(const QVector<QColor> &palette);
     static QVector<QColor> paletteFromText(const QString &text);
     static QVector<QColor> defaultPalette();
+    static QVector<QColor> themePalette();
 
 protected:
     bool eventFilter(QObject *obj, QEvent *event) override;
@@ -90,8 +92,12 @@ private slots:
     void savePalette();
     void openPalette();
     void resetPalette();
+    void useDefaultPalette();
+    void useThemePalette();
 
 private:
+    enum class PaletteSource { Classic, Theme, Custom };
+
     void updateSliders(const QColor &color);
     void updateHsvSliders(const QColor &color);
     void updateHex(const QColor &color);
@@ -102,9 +108,16 @@ private:
     // Rebuilds the swatch button grid from m_palette. Called after any edit to
     // the palette (add / open / reset).
     void rebuildSwatchGrid();
+    void loadPaletteSettings();
+    void savePaletteSettings();
+    void updatePaletteActions();
+    void setPaletteSource(PaletteSource source);
 
     QVector<QColor> m_palette;
+    PaletteSource m_paletteSource = PaletteSource::Classic;
     class QGridLayout *m_swatchGrid = nullptr;
+    QAction *m_defaultPaletteAction = nullptr;
+    QAction *m_themePaletteAction = nullptr;
 
     Document *m_document = nullptr;
     class QComboBox *m_slotCombo = nullptr;
