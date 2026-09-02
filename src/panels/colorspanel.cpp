@@ -716,8 +716,9 @@ void ColorsPanel::createSwatches(QBoxLayout *parentLayout) {
     paletteHeader->addWidget(addBtn);
 
     auto *menuBtn = new QToolButton;
+    menuBtn->setObjectName(QStringLiteral("PaletteMenuButton"));
     menuBtn->setText(TR("Palette"));
-    menuBtn->setFixedHeight(20);
+    menuBtn->setMinimumHeight(Theme::scaledMetric(20));
     menuBtn->setPopupMode(QToolButton::InstantPopup);
     auto *menu = new QMenu(menuBtn);
     auto *paletteGroup = new QActionGroup(menu);

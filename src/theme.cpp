@@ -180,6 +180,8 @@ const char *kLight = R"(
     QToolButton:hover { background-color: #e3eff9; border-color: #a8cdea; }
     QToolButton:checked { background-color: #cde4fa; border-color: #7ab0dd; }
     QToolButton:pressed { background-color: #b6d8f5; }
+    QToolButton#PaletteMenuButton { padding-left: 5px; padding-right: 22px; }
+    QToolButton#PaletteMenuButton::menu-indicator { subcontrol-origin: padding; subcontrol-position: center right; right: 4px; }
 
     QDockWidget { font-size: 11px; color: #1f1f1f; background-color: #f0f0f0; }
     QDockWidget::title { background-color: #e4e4e4; border: 1px solid #cfcfcf; padding: 4px 6px; color: #333333; font-weight: bold; text-align: left; }
@@ -264,6 +266,8 @@ const char *kDark = R"(
     QToolButton:hover { background-color: #3d3d3d; border-color: #5a5a5a; }
     QToolButton:checked { background-color: #2d6ba3; border-color: #4a90d9; }
     QToolButton:pressed { background-color: #2d6ba3; }
+    QToolButton#PaletteMenuButton { padding-left: 5px; padding-right: 22px; }
+    QToolButton#PaletteMenuButton::menu-indicator { subcontrol-origin: padding; subcontrol-position: center right; right: 4px; }
 
     QDockWidget { font-size: 11px; color: #f0f0f0; background-color: #2b2b2b; }
     QDockWidget::title { background-color: #3a3a3a; border: 1px solid #4a4a4a; padding: 4px 6px; color: #e8e8e8; font-weight: bold; text-align: left; }
@@ -365,6 +369,8 @@ const char *kOmarchy = R"(
     QToolButton:hover { background-color: @selection@; border-color: @muted@; }
     QToolButton:checked, QToolButton:pressed { background-color: @accent@; color: @onAccent@; border-color: @accent@; }
     QToolButton:disabled { color: @disabled@; }
+    QToolButton#PaletteMenuButton { padding-left: 5px; padding-right: 22px; }
+    QToolButton#PaletteMenuButton::menu-indicator { subcontrol-origin: padding; subcontrol-position: center right; right: 4px; }
 
     QDockWidget { color: @foreground@; background-color: @background@; }
     QDockWidget::title { background-color: @lighter@; border: 1px solid @muted@; padding: 4px 6px; color: @bright@; font-weight: bold; text-align: left; }

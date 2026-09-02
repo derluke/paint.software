@@ -715,6 +715,9 @@ int main(int argc, char **argv) {
         CHECK(Theme::isDark(), "Dark scheme is dark");
         QString ds = Theme::styleSheet();
         CHECK(ds.contains("QMenuBar") && ds != ls, "Dark stylesheet differs from light");
+        CHECK(ds.contains("QToolButton#PaletteMenuButton")
+                  && ds.contains("padding-right: 22px"),
+              "palette dropdown reserves a separate menu-indicator gutter");
         CHECK(Theme::canvasBackdrop() != QString("#969696"), "Dark backdrop differs from light");
 
         QTemporaryDir omarchyTheme;
