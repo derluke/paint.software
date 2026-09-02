@@ -12,39 +12,24 @@ static const int TS = 20; // Tool icon size
 static const int TBS = 16; // Toolbar icon size
 
 QPixmap mkpm(int size) {
-    QPixmap pm(size, size);
-    pm.fill(Qt::transparent);
-    return pm;
+    return Theme::iconCanvas(size);
 }
 
-// The icons are line art drawn in dark tones, which disappears against the dark
-// colour scheme. On the dark theme we LIGHTEN every dark pixel (keeping its hue
-// and saturation) so nothing stays invisible — neutral blacks become near-white,
-// dark browns/blues become light browns/blues, while already-light pixels are
-// left alone.
-QIcon themed(const QPixmap &pm) {
-    if (!Theme::isDark())
-        return QIcon(pm);
+QColor ink()       { return Theme::color(Theme::ColorRole::Foreground); }
+QColor mutedInk()  { return Theme::color(Theme::ColorRole::Muted); }
+QColor accent()    { return Theme::color(Theme::ColorRole::Accent); }
+QColor surface()   { return Theme::color(Theme::ColorRole::Surface); }
+QColor raised()    { return Theme::color(Theme::ColorRole::Raised); }
+QColor danger()    { return Theme::color(Theme::ColorRole::Danger); }
+QColor success()   { return Theme::color(Theme::ColorRole::Success); }
+QColor warning()   { return Theme::color(Theme::ColorRole::Warning); }
+QColor cyan()       { return Theme::color(Theme::ColorRole::Cyan); }
+QColor blue()       { return Theme::color(Theme::ColorRole::Blue); }
+QColor secondary() { return Theme::color(Theme::ColorRole::Secondary); }
 
-    QImage img = pm.toImage().convertToFormat(QImage::Format_ARGB32);
-    for (int y = 0; y < img.height(); ++y) {
-        QRgb *line = reinterpret_cast<QRgb*>(img.scanLine(y));
-        for (int x = 0; x < img.width(); ++x) {
-            const int a = qAlpha(line[x]);
-            if (a == 0) continue;
-            int h, s, l, al;
-            QColor c = QColor::fromRgb(line[x]);
-            c.getHsl(&h, &s, &l, &al);
-            if (l < 150) {
-                // Reflect dark lightness up towards white (dark -> light) while
-                // keeping the hue; the darker it was, the lighter it becomes.
-                const int nl = qBound(0, 235 - l, 255);
-                c.setHsl(h < 0 ? 0 : h, s, nl, a);
-                line[x] = c.rgba();
-            }
-        }
-    }
-    return QIcon(QPixmap::fromImage(img));
+QPen iconPen(const QColor &color, qreal width = 1.4) {
+    QPen pen(color, width, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
+    return pen;
 }
 
 void aa(QPainter &p) {
@@ -54,13 +39,12 @@ void aa(QPainter &p) {
 // ==================== TOOL ICONS (20x20) ====================
 
 // ---- Colourful, paint.net-style tool icons -------------------------------
-// These are drawn in real colours (like paint.net's) so they read the same on a
-// light or dark background — they deliberately bypass themed(), which exists only
-// to rescue the older dark line-art icons.
+// Their silhouettes remain familiar, but the blues, greens, ambers and violets
+// come from the active semantic theme so the full palette changes coherently.
 
 // Small helper: the dashed "marching ants" outline used by the selection tools.
 void marchingAnts(QPainter &p) {
-    QPen pen(QColor(65, 75, 88), 1.2, Qt::DashLine);
+    QPen pen(mutedInk(), 1.2, Qt::DashLine);
     QVector<qreal> d; d << 2.5 << 1.8;
     pen.setDashPattern(d);
     p.setPen(pen);
@@ -72,7 +56,8 @@ QPixmap drawRectSelect() {
     QPainter p(&pm);
     aa(p);
     p.setPen(Qt::NoPen);
-    p.setBrush(QColor(137, 190, 233));      // light blue plate
+    QColor plate = accent(); plate.setAlpha(190);
+    p.setBrush(plate);
     p.drawRect(4, 4, 12, 12);
     marchingAnts(p);
     p.drawRect(4, 4, 12, 12);
@@ -85,7 +70,8 @@ QPixmap drawEllipseSelect() {
     QPainter p(&pm);
     aa(p);
     p.setPen(Qt::NoPen);
-    p.setBrush(QColor(137, 190, 233));
+    QColor plate = accent(); plate.setAlpha(190);
+    p.setBrush(plate);
     p.drawEllipse(3, 3, 14, 14);
     marchingAnts(p);
     p.drawEllipse(3, 3, 14, 14);
@@ -98,11 +84,11 @@ QPixmap drawMagicWand() {
     QPainter p(&pm);
     aa(p);
     // Slate shaft running bottom-left -> top-right, with a lighter tip.
-    QPen shaft(QColor(74, 85, 101), 3.0);
+    QPen shaft(mutedInk(), 3.0);
     shaft.setCapStyle(Qt::RoundCap);
     p.setPen(shaft);
     p.drawLine(3, 17, 11, 9);
-    QPen tip(QColor(196, 208, 222), 3.0);
+    QPen tip(ink(), 3.0);
     tip.setCapStyle(Qt::RoundCap);
     p.setPen(tip);
     p.drawLine(11, 9, 13, 7);
@@ -113,9 +99,9 @@ QPixmap drawMagicWand() {
         p.drawLine(QPointF(cx, cy - r), QPointF(cx, cy + r));
         p.drawLine(QPointF(cx - r, cy), QPointF(cx + r, cy));
     };
-    sparkle(15.5, 4.0, 3.2, QColor(255, 196, 36), 1.6);
-    sparkle(9.5, 3.0, 1.9, QColor(255, 226, 120), 1.2);
-    sparkle(18.0, 9.5, 1.7, QColor(255, 226, 120), 1.2);
+    sparkle(15.5, 4.0, 3.2, warning(), 1.6);
+    sparkle(9.5, 3.0, 1.9, warning().lighter(125), 1.2);
+    sparkle(18.0, 9.5, 1.7, warning().lighter(125), 1.2);
     p.end();
     return pm;
 }
@@ -129,17 +115,17 @@ QPixmap drawMove() {
     a.moveTo(2, 1); a.lineTo(2, 12.5); a.lineTo(5.0, 9.8);
     a.lineTo(7.0, 14.2); a.lineTo(8.9, 13.3); a.lineTo(7.0, 9.2);
     a.lineTo(11.0, 8.8); a.closeSubpath();
-    p.setPen(QPen(QColor(32, 56, 92), 1.0));
-    p.setBrush(QColor(96, 146, 205));
+    p.setPen(QPen(accent().darker(145), 1.0));
+    p.setBrush(accent());
     p.drawPath(a);
     // Compact move cross, bottom-right.
     const qreal cx = 14.5, cy = 14.5, r = 5.0;
-    QPen cp(QColor(64, 84, 110), 1.3); cp.setCapStyle(Qt::RoundCap);
+    QPen cp(mutedInk(), 1.3); cp.setCapStyle(Qt::RoundCap);
     p.setPen(cp);
     p.drawLine(QPointF(cx, cy - r), QPointF(cx, cy + r));
     p.drawLine(QPointF(cx - r, cy), QPointF(cx + r, cy));
     p.setPen(Qt::NoPen);
-    p.setBrush(QColor(64, 84, 110));
+    p.setBrush(mutedInk());
     const qreal h = 2.0;
     QPointF up[] = {QPointF(cx, cy - r - 0.8), QPointF(cx - h, cy - r + 1.6), QPointF(cx + h, cy - r + 1.6)};
     QPointF dn[] = {QPointF(cx, cy + r + 0.8), QPointF(cx - h, cy + r - 1.6), QPointF(cx + h, cy + r - 1.6)};
@@ -156,24 +142,24 @@ QPixmap drawBrush() {
     QPainter p(&pm);
     aa(p);
     QLinearGradient hg(18, 1, 8, 11);
-    hg.setColorAt(0.0, QColor(126, 180, 238));
-    hg.setColorAt(1.0, QColor(54, 106, 178));
-    p.setPen(QPen(QColor(28, 58, 98), 0.9));
+    hg.setColorAt(0.0, accent().lighter(130));
+    hg.setColorAt(1.0, accent().darker(115));
+    p.setPen(QPen(accent().darker(155), 0.9));
     p.setBrush(hg);
     QPainterPath h;
     h.moveTo(17.4, 1.2); h.lineTo(19.0, 2.8); h.lineTo(10.2, 11.6); h.lineTo(8.4, 9.8);
     h.closeSubpath();
     p.drawPath(h);
     // Ferrule
-    p.setPen(QPen(QColor(92, 98, 110), 0.9));
-    p.setBrush(QColor(198, 205, 216));
+    p.setPen(QPen(mutedInk(), 0.9));
+    p.setBrush(ink());
     QPainterPath f;
     f.moveTo(10.2, 11.6); f.lineTo(8.4, 9.8); f.lineTo(6.2, 12.0); f.lineTo(8.0, 13.8);
     f.closeSubpath();
     p.drawPath(f);
     // Bristles
     p.setPen(Qt::NoPen);
-    p.setBrush(QColor(40, 92, 170));
+    p.setBrush(accent().darker(130));
     QPainterPath b;
     b.moveTo(6.2, 12.0); b.lineTo(8.0, 13.8); b.lineTo(1.8, 18.6);
     b.closeSubpath();
@@ -188,23 +174,23 @@ QPixmap drawPencil() {
     QPainter p(&pm);
     aa(p);
     QLinearGradient bg(16, 2, 7, 12);
-    bg.setColorAt(0.0, QColor(255, 208, 88));
-    bg.setColorAt(1.0, QColor(236, 158, 40));
-    p.setPen(QPen(QColor(122, 78, 20), 0.9));
+    bg.setColorAt(0.0, warning().lighter(125));
+    bg.setColorAt(1.0, warning());
+    p.setPen(QPen(warning().darker(155), 0.9));
     p.setBrush(bg);
     QPainterPath body;
     body.moveTo(16.2, 1.4); body.lineTo(18.2, 3.4); body.lineTo(7.6, 13.6); body.lineTo(5.6, 11.6);
     body.closeSubpath();
     p.drawPath(body);
     // Wood collar
-    p.setBrush(QColor(228, 192, 142));
+    p.setBrush(warning().lighter(145));
     QPainterPath collar;
     collar.moveTo(7.6, 13.6); collar.lineTo(5.6, 11.6); collar.lineTo(4.2, 13.0); collar.lineTo(6.2, 15.0);
     collar.closeSubpath();
     p.drawPath(collar);
     // Graphite tip
     p.setPen(Qt::NoPen);
-    p.setBrush(QColor(56, 56, 62));
+    p.setBrush(ink());
     QPainterPath tip;
     tip.moveTo(6.2, 15.0); tip.lineTo(4.2, 13.0); tip.lineTo(1.8, 18.4); tip.closeSubpath();
     p.drawPath(tip);
@@ -217,21 +203,21 @@ QPixmap drawEraser() {
     QPixmap pm = mkpm(TS);
     QPainter p(&pm);
     aa(p);
-    p.setPen(QPen(QColor(88, 42, 100), 1.0));
+    p.setPen(QPen(secondary().darker(150), 1.0));
     // Top face (light magenta)
-    p.setBrush(QColor(212, 130, 220));
+    p.setBrush(secondary().lighter(125));
     QPainterPath top;
     top.moveTo(12.8, 2.4); top.lineTo(18.0, 7.6); top.lineTo(10.4, 13.4); top.lineTo(5.2, 8.2);
     top.closeSubpath();
     p.drawPath(top);
     // Front face (deeper violet) -> gives the 3D block feel
-    p.setBrush(QColor(150, 72, 168));
+    p.setBrush(secondary().darker(120));
     QPainterPath front;
     front.moveTo(5.2, 8.2); front.lineTo(10.4, 13.4); front.lineTo(10.4, 17.2); front.lineTo(5.2, 12.0);
     front.closeSubpath();
     p.drawPath(front);
     // Side face (mid tone)
-    p.setBrush(QColor(180, 100, 196));
+    p.setBrush(secondary());
     QPainterPath side;
     side.moveTo(10.4, 13.4); side.lineTo(18.0, 7.6); side.lineTo(18.0, 11.0); side.lineTo(10.4, 17.2);
     side.closeSubpath();
@@ -253,14 +239,14 @@ QPixmap drawFill() {
 
     // Handle behind the body
     p.setBrush(Qt::NoBrush);
-    p.setPen(QPen(QColor(76, 96, 122), 1.2));
+    p.setPen(QPen(mutedInk(), 1.2));
     p.drawArc(QRectF(6.0, 1.6, 8.0, 7.0), 15 * 16, 150 * 16);
 
     // Tapered body with a blue sheen
     QLinearGradient bg(5.5, 0, 14.5, 0);
-    bg.setColorAt(0.0, QColor(112, 170, 234));
-    bg.setColorAt(1.0, QColor(40, 96, 172));
-    p.setPen(QPen(QColor(26, 58, 104), 1.0));
+    bg.setColorAt(0.0, accent().lighter(130));
+    bg.setColorAt(1.0, accent().darker(120));
+    p.setPen(QPen(accent().darker(155), 1.0));
     p.setBrush(bg);
     QPainterPath body;
     body.moveTo(5.2, 6.2); body.lineTo(14.8, 6.2);
@@ -269,13 +255,13 @@ QPixmap drawFill() {
     p.drawPath(body);
 
     // Rim (lighter ellipse on top)
-    p.setBrush(QColor(158, 206, 246));
+    p.setBrush(accent().lighter(145));
     p.drawEllipse(QRectF(5.2, 4.1, 9.6, 4.2));
     p.restore();
 
     // Paint pouring out to the bottom-right
     p.setPen(Qt::NoPen);
-    p.setBrush(QColor(48, 112, 198));
+    p.setBrush(accent());
     QPainterPath drip;
     drip.moveTo(12.6, 11.4);
     drip.quadTo(17.6, 14.0, 15.8, 18.4);
@@ -292,19 +278,19 @@ QPixmap drawColorPicker() {
     QPainter p(&pm);
     aa(p);
     // Bulb
-    p.setPen(QPen(QColor(28, 60, 102), 0.9));
-    p.setBrush(QColor(92, 150, 216));
+    p.setPen(QPen(accent().darker(155), 0.9));
+    p.setBrush(accent());
     p.drawEllipse(QRectF(10.8, 1.0, 7.8, 7.8));
     // Barrel
-    p.setPen(QPen(QColor(92, 98, 110), 0.9));
-    p.setBrush(QColor(202, 210, 222));
+    p.setPen(QPen(mutedInk(), 0.9));
+    p.setBrush(ink());
     QPainterPath shaft;
     shaft.moveTo(12.4, 7.4); shaft.lineTo(14.8, 9.8); shaft.lineTo(7.4, 15.6); shaft.lineTo(5.2, 13.4);
     shaft.closeSubpath();
     p.drawPath(shaft);
     // Tip
     p.setPen(Qt::NoPen);
-    p.setBrush(QColor(50, 54, 62));
+    p.setBrush(mutedInk());
     QPainterPath tip;
     tip.moveTo(7.4, 15.6); tip.lineTo(5.2, 13.4); tip.lineTo(1.8, 18.6); tip.closeSubpath();
     p.drawPath(tip);
@@ -318,18 +304,18 @@ QPixmap drawRecolor() {
     QPainter p(&pm);
     aa(p);
     // Blue disc
-    p.setPen(QPen(QColor(26, 58, 100), 0.9));
-    p.setBrush(QColor(72, 128, 202));
+    p.setPen(QPen(accent().darker(155), 0.9));
+    p.setBrush(accent());
     p.drawEllipse(QRectF(2.6, 5.4, 11.2, 11.2));
     // Red sweep
-    QPen ap(QColor(212, 64, 42), 2.1);
+    QPen ap(danger(), 2.1);
     ap.setCapStyle(Qt::RoundCap);
     p.setPen(ap);
     p.setBrush(Qt::NoBrush);
     p.drawArc(QRectF(4.6, 2.4, 13.0, 13.0), 15 * 16, 205 * 16);
     // Arrow head
     p.setPen(Qt::NoPen);
-    p.setBrush(QColor(212, 64, 42));
+    p.setBrush(danger());
     QPointF ah[] = { QPointF(18.6, 7.6), QPointF(13.6, 6.9), QPointF(16.3, 11.4) };
     p.drawPolygon(ah, 3);
     p.end();
@@ -342,17 +328,17 @@ QPixmap drawCloneStamp() {
     QPainter p(&pm);
     aa(p);
     // Knob
-    p.setPen(QPen(QColor(38, 42, 50), 0.9));
-    p.setBrush(QColor(82, 90, 104));
+    p.setPen(QPen(mutedInk(), 0.9));
+    p.setBrush(ink());
     p.drawEllipse(QRectF(7.0, 1.0, 6.0, 5.2));
     // Stem
-    p.setBrush(QColor(112, 120, 134));
+    p.setBrush(mutedInk());
     p.drawRect(QRectF(8.6, 4.8, 2.8, 5.4));
     // Amber base
-    p.setPen(QPen(QColor(140, 84, 20), 0.9));
+    p.setPen(QPen(warning().darker(155), 0.9));
     QLinearGradient bg(4, 10, 16, 15);
-    bg.setColorAt(0.0, QColor(248, 182, 88));
-    bg.setColorAt(1.0, QColor(210, 130, 36));
+    bg.setColorAt(0.0, warning().lighter(125));
+    bg.setColorAt(1.0, warning());
     p.setBrush(bg);
     QPainterPath base;
     base.moveTo(5.0, 10.2); base.lineTo(15.0, 10.2);
@@ -360,7 +346,7 @@ QPixmap drawCloneStamp() {
     base.closeSubpath();
     p.drawPath(base);
     // Foot
-    p.setBrush(QColor(184, 110, 28));
+    p.setBrush(warning().darker(125));
     p.drawRect(QRectF(3.2, 14.6, 13.6, 2.6));
     p.end();
     return pm;
@@ -377,7 +363,7 @@ QPixmap drawText() {
     font.setBold(true);
     font.setFamily("Serif");
     p.setFont(font);
-    p.setPen(QColor(146, 162, 186));
+    p.setPen(ink());
     p.drawText(QRect(0, 0, TS, TS), Qt::AlignCenter, "T");
     p.end();
     return pm;
@@ -388,7 +374,7 @@ QPixmap drawLine() {
     QPixmap pm = mkpm(TS);
     QPainter p(&pm);
     aa(p);
-    QPen cp(QColor(158, 172, 192), 1.9);
+    QPen cp(ink(), 1.9);
     cp.setCapStyle(Qt::RoundCap);
     p.setPen(cp);
     p.setBrush(Qt::NoBrush);
@@ -397,8 +383,8 @@ QPixmap drawLine() {
     c.cubicTo(7.0, 6.0, 13.0, 18.0, 16.8, 4.0);
     p.drawPath(c);
     // Control nodes
-    p.setPen(QPen(QColor(28, 60, 100), 0.9));
-    p.setBrush(QColor(100, 154, 216));
+    p.setPen(QPen(accent().darker(155), 0.9));
+    p.setBrush(accent());
     p.drawEllipse(QPointF(3.4, 16.4), 2.3, 2.3);
     p.drawEllipse(QPointF(16.8, 4.0), 2.3, 2.3);
     p.end();
@@ -411,17 +397,17 @@ QPixmap drawShape() {
     QPainter p(&pm);
     aa(p);
     // Blue square (back)
-    p.setPen(QPen(QColor(28, 60, 104), 0.9));
-    p.setBrush(QColor(80, 138, 210));
+    p.setPen(QPen(accent().darker(150), 0.9));
+    p.setBrush(accent());
     p.drawRect(QRectF(1.6, 2.8, 9.4, 9.4));
     // Green triangle (right)
-    p.setPen(QPen(QColor(34, 92, 52), 0.9));
-    p.setBrush(QColor(106, 184, 110));
+    p.setPen(QPen(success().darker(150), 0.9));
+    p.setBrush(success());
     QPointF tri[] = { QPointF(14.6, 6.2), QPointF(19.0, 16.8), QPointF(10.2, 16.8) };
     p.drawPolygon(tri, 3);
     // Purple circle (front)
-    p.setPen(QPen(QColor(84, 40, 110), 0.9));
-    p.setBrush(QColor(170, 98, 210));
+    p.setPen(QPen(secondary().darker(150), 0.9));
+    p.setBrush(secondary());
     p.drawEllipse(QRectF(5.8, 8.2, 8.8, 8.8));
     p.end();
     return pm;
@@ -433,9 +419,9 @@ QPixmap drawGradient() {
     QPainter p(&pm);
     aa(p);
     QLinearGradient grad(3, 3, 17, 17);
-    grad.setColorAt(0.0, QColor(166, 100, 220));
-    grad.setColorAt(1.0, QColor(56, 104, 198));
-    p.setPen(QPen(QColor(44, 54, 74), 1.1));
+    grad.setColorAt(0.0, secondary());
+    grad.setColorAt(1.0, accent());
+    p.setPen(QPen(mutedInk(), 1.1));
     p.setBrush(grad);
     p.drawRoundedRect(QRectF(3, 3, 14, 14), 1.6, 1.6);
     p.end();
@@ -448,10 +434,11 @@ QPixmap drawLasso() {
     QPixmap pm = mkpm(TS);
     QPainter p(&pm);
     aa(p);
-    QPen rope(QColor(50, 106, 176), 1.7);
+    QPen rope(accent(), 1.7);
     rope.setCapStyle(Qt::RoundCap);
     p.setPen(rope);
-    p.setBrush(QColor(178, 215, 245));
+    QColor lassoFill = accent(); lassoFill.setAlpha(150);
+    p.setBrush(lassoFill);
     p.drawEllipse(QRectF(3.2, 2.0, 12.4, 9.8));
     // Tail curling away from the loop
     p.setBrush(Qt::NoBrush);
@@ -473,19 +460,19 @@ QPixmap drawMoveSelection() {
     a.moveTo(2, 1); a.lineTo(2, 12.5); a.lineTo(5.0, 9.8);
     a.lineTo(7.0, 14.2); a.lineTo(8.9, 13.3); a.lineTo(7.0, 9.2);
     a.lineTo(11.0, 8.8); a.closeSubpath();
-    QPen ap(QColor(104, 154, 212), 1.3);
+    QPen ap(accent(), 1.3);
     ap.setJoinStyle(Qt::RoundJoin);
     p.setPen(ap);
     p.setBrush(Qt::NoBrush);          // hollow
     p.drawPath(a);
     // Same compact move cross as the Move tool.
     const qreal cx = 14.5, cy = 14.5, r = 5.0;
-    QPen cp(QColor(64, 84, 110), 1.3); cp.setCapStyle(Qt::RoundCap);
+    QPen cp(mutedInk(), 1.3); cp.setCapStyle(Qt::RoundCap);
     p.setPen(cp);
     p.drawLine(QPointF(cx, cy - r), QPointF(cx, cy + r));
     p.drawLine(QPointF(cx - r, cy), QPointF(cx + r, cy));
     p.setPen(Qt::NoPen);
-    p.setBrush(QColor(64, 84, 110));
+    p.setBrush(mutedInk());
     const qreal h = 2.0;
     QPointF up[] = {QPointF(cx, cy - r - 0.8), QPointF(cx - h, cy - r + 1.6), QPointF(cx + h, cy - r + 1.6)};
     QPointF dn[] = {QPointF(cx, cy + r + 0.8), QPointF(cx - h, cy + r - 1.6), QPointF(cx + h, cy + r - 1.6)};
@@ -502,19 +489,21 @@ QPixmap drawZoom() {
     QPainter p(&pm);
     aa(p);
     // Handle (drawn first, behind the lens)
-    QPen hp(QColor(78, 88, 104), 2.7);
+    QPen hp(mutedInk(), 2.7);
     hp.setCapStyle(Qt::RoundCap);
     p.setPen(hp);
     p.drawLine(QPointF(12.4, 12.4), QPointF(17.6, 17.6));
     // Lens
     QRadialGradient lg(7.2, 6.6, 7.0);
-    lg.setColorAt(0.0, QColor(212, 236, 252));
-    lg.setColorAt(1.0, QColor(118, 176, 226));
-    p.setPen(QPen(QColor(36, 72, 118), 1.6));
+    QColor lensLight = accent().lighter(155); lensLight.setAlpha(210);
+    QColor lensDark = accent(); lensDark.setAlpha(190);
+    lg.setColorAt(0.0, lensLight);
+    lg.setColorAt(1.0, lensDark);
+    p.setPen(QPen(accent().darker(145), 1.6));
     p.setBrush(lg);
     p.drawEllipse(QRectF(2.2, 2.2, 11.6, 11.6));
     // Plus
-    QPen pp(QColor(36, 72, 118), 1.5);
+    QPen pp(accent().darker(145), 1.5);
     pp.setCapStyle(Qt::RoundCap);
     p.setPen(pp);
     p.drawLine(QPointF(8.0, 4.9), QPointF(8.0, 11.1));
@@ -529,10 +518,10 @@ QPixmap drawPan() {
     aa(p);
     // Clean open "grab" hand, in paint.net's warm skin tone. The outline is a warm
     // brown (not neutral ink) so the icon reads on a light AND a dark palette
-    // without needing themed().
-    const QColor ink(150, 98, 54);
-    const QColor skin(243, 208, 168);
-    p.setPen(QPen(ink, 1.1, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    // while remaining part of the active semantic palette.
+    const QColor handInk = warning().darker(145);
+    const QColor skin = warning().lighter(145);
+    p.setPen(QPen(handInk, 1.1, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
     p.setBrush(skin);
 
     QPainterPath hand;
@@ -562,17 +551,19 @@ QPixmap drawNewDoc() {
     QPixmap pm = mkpm(TBS);
     QPainter p(&pm);
     aa(p);
-    // Page
-    p.setPen(QPen(QColor(100, 100, 100), 1));
-    p.setBrush(Qt::white);
+    p.setPen(iconPen(ink()));
+    p.setBrush(surface());
     QPainterPath page;
-    page.moveTo(3, 1); page.lineTo(10, 1); page.lineTo(13, 4); page.lineTo(13, 15); page.lineTo(3, 15); page.closeSubpath();
+    page.moveTo(2.5, 1.5); page.lineTo(9.5, 1.5); page.lineTo(13.5, 5.5);
+    page.lineTo(13.5, 14.5); page.lineTo(2.5, 14.5); page.closeSubpath();
     p.drawPath(page);
-    // Corner fold
-    p.setBrush(QColor(200, 210, 230));
+    p.setBrush(raised());
     QPainterPath fold;
-    fold.moveTo(10, 1); fold.lineTo(10, 4); fold.lineTo(13, 4); fold.closeSubpath();
+    fold.moveTo(9.5, 1.5); fold.lineTo(9.5, 5.5); fold.lineTo(13.5, 5.5);
     p.drawPath(fold);
+    p.setPen(iconPen(accent(), 1.8));
+    p.drawLine(QPointF(7.0, 10.8), QPointF(11.8, 10.8));
+    p.drawLine(QPointF(9.4, 8.4), QPointF(9.4, 13.2));
     p.end();
     return pm;
 }
@@ -581,17 +572,15 @@ QPixmap drawOpenDoc() {
     QPixmap pm = mkpm(TBS);
     QPainter p(&pm);
     aa(p);
-    // Folder back
-    p.setPen(QPen(QColor(150, 120, 30), 1));
-    p.setBrush(QColor(230, 190, 60));
-    p.drawRoundedRect(1, 3, 14, 11, 1, 1);
-    // Tab
-    p.drawRoundedRect(1, 1, 6, 3, 1, 1);
-    // Open front
-    p.setBrush(QColor(250, 215, 80));
+    p.setPen(iconPen(ink()));
+    p.setBrush(surface());
     QPainterPath front;
-    front.moveTo(1, 7); front.lineTo(3, 14); front.lineTo(15, 14); front.lineTo(15, 7); front.closeSubpath();
+    front.moveTo(1.5, 4.5); front.lineTo(1.5, 13.5); front.lineTo(14.5, 13.5);
+    front.lineTo(14.5, 5.5); front.lineTo(8.0, 5.5); front.lineTo(6.0, 3.0);
+    front.lineTo(2.5, 3.0); front.quadTo(1.5, 3.0, 1.5, 4.5);
     p.drawPath(front);
+    p.setPen(iconPen(accent(), 1.7));
+    p.drawLine(QPointF(4.0, 9.4), QPointF(12.0, 9.4));
     p.end();
     return pm;
 }
@@ -600,23 +589,15 @@ QPixmap drawSaveDoc() {
     QPixmap pm = mkpm(TBS);
     QPainter p(&pm);
     aa(p);
-    // Floppy disk body
-    p.setPen(QPen(QColor(30, 60, 120), 1));
-    p.setBrush(QColor(70, 130, 210));
-    p.drawRoundedRect(1, 1, 14, 14, 1, 1);
-    // Metal shutter
-    p.setBrush(QColor(180, 185, 195));
-    p.drawRect(4, 1, 8, 5);
-    // Shutter slot
-    p.setBrush(QColor(70, 130, 210));
-    p.drawRect(9, 1, 2, 4);
-    // Label area
-    p.setBrush(Qt::white);
-    p.drawRect(3, 9, 10, 5);
-    // Label lines
-    p.setPen(QPen(QColor(150, 150, 150), 0.5));
-    p.drawLine(5, 11, 11, 11);
-    p.drawLine(5, 13, 11, 13);
+    p.setPen(iconPen(ink()));
+    p.setBrush(Qt::NoBrush);
+    p.drawRoundedRect(QRectF(2.0, 1.5, 12.0, 13.0), 1.5, 1.5);
+    p.setPen(iconPen(accent(), 1.7));
+    p.drawLine(QPointF(8.0, 3.0), QPointF(8.0, 10.0));
+    p.drawLine(QPointF(5.5, 7.6), QPointF(8.0, 10.1));
+    p.drawLine(QPointF(10.5, 7.6), QPointF(8.0, 10.1));
+    p.setPen(iconPen(ink()));
+    p.drawLine(QPointF(4.5, 12.5), QPointF(11.5, 12.5));
     p.end();
     return pm;
 }
@@ -625,11 +606,11 @@ QPixmap drawUndo() {
     QPixmap pm = mkpm(TBS);
     QPainter p(&pm);
     aa(p);
-    p.setPen(QPen(QColor(50, 100, 200), 2));
+    p.setPen(iconPen(accent(), 1.8));
     p.setBrush(Qt::NoBrush);
     p.drawArc(QRect(3, 4, 10, 10), 45*16, 225*16);
     // Arrow head
-    p.setBrush(QColor(50, 100, 200));
+    p.setBrush(accent());
     p.setPen(Qt::NoPen);
     QPointF arr[] = {QPointF(3, 4), QPointF(7, 3), QPointF(5, 7)};
     p.drawPolygon(arr, 3);
@@ -641,11 +622,11 @@ QPixmap drawRedo() {
     QPixmap pm = mkpm(TBS);
     QPainter p(&pm);
     aa(p);
-    p.setPen(QPen(QColor(50, 100, 200), 2));
+    p.setPen(iconPen(accent(), 1.8));
     p.setBrush(Qt::NoBrush);
     p.drawArc(QRect(3, 4, 10, 10), -45*16, -225*16);
     // Arrow head
-    p.setBrush(QColor(50, 100, 200));
+    p.setBrush(accent());
     p.setPen(Qt::NoPen);
     QPointF arr[] = {QPointF(13, 4), QPointF(9, 3), QPointF(11, 7)};
     p.drawPolygon(arr, 3);
@@ -657,7 +638,7 @@ QPixmap drawCut() {
     QPixmap pm = mkpm(TBS);
     QPainter p(&pm);
     aa(p);
-    p.setPen(QPen(QColor(60, 60, 60), 1.3));
+    p.setPen(iconPen(ink(), 1.3));
     p.setBrush(Qt::NoBrush);
     // Left blade
     p.drawEllipse(1, 10, 5, 5);
@@ -666,7 +647,7 @@ QPixmap drawCut() {
     p.drawEllipse(10, 10, 5, 5);
     p.drawLine(12, 11, 6, 3);
     // Pivot
-    p.setBrush(QColor(60, 60, 60));
+    p.setBrush(ink());
     p.drawEllipse(QPointF(8, 7), 1.2, 1.2);
     p.end();
     return pm;
@@ -676,18 +657,14 @@ QPixmap drawCopy() {
     QPixmap pm = mkpm(TBS);
     QPainter p(&pm);
     aa(p);
-    p.setPen(QPen(QColor(100, 100, 100), 1));
-    // Back page
-    p.setBrush(QColor(220, 225, 235));
-    p.drawRect(4, 1, 11, 11);
-    // Front page
-    p.setBrush(Qt::white);
-    p.drawRect(1, 4, 11, 11);
-    // Lines on front
-    p.setPen(QPen(QColor(170, 170, 170), 0.7));
-    p.drawLine(3, 8, 10, 8);
-    p.drawLine(3, 10, 10, 10);
-    p.drawLine(3, 12, 8, 12);
+    p.setBrush(surface());
+    p.setPen(iconPen(mutedInk(), 1.2));
+    p.drawRoundedRect(QRectF(4.5, 1.5, 10.0, 10.0), 1.0, 1.0);
+    p.setPen(iconPen(ink(), 1.3));
+    p.drawRoundedRect(QRectF(1.5, 4.5, 10.0, 10.0), 1.0, 1.0);
+    p.setPen(iconPen(accent(), 1.2));
+    p.drawLine(QPointF(4.0, 8.0), QPointF(9.0, 8.0));
+    p.drawLine(QPointF(4.0, 10.5), QPointF(8.0, 10.5));
     p.end();
     return pm;
 }
@@ -696,21 +673,15 @@ QPixmap drawPaste() {
     QPixmap pm = mkpm(TBS);
     QPainter p(&pm);
     aa(p);
-    // Clipboard
-    p.setPen(QPen(QColor(140, 110, 50), 1));
-    p.setBrush(QColor(210, 180, 100));
-    p.drawRoundedRect(1, 2, 11, 13, 1, 1);
-    // Clip
-    p.setBrush(QColor(160, 140, 80));
-    p.drawRoundedRect(4, 1, 5, 3, 1, 1);
-    // Page on clipboard
-    p.setPen(QPen(QColor(100, 100, 100), 0.8));
-    p.setBrush(Qt::white);
-    p.drawRect(3, 5, 8, 8);
-    // Lines
-    p.setPen(QPen(QColor(170, 170, 170), 0.7));
-    p.drawLine(5, 7, 9, 7);
-    p.drawLine(5, 9, 9, 9);
+    p.setPen(iconPen(ink(), 1.3));
+    p.setBrush(surface());
+    p.drawRoundedRect(QRectF(2.0, 2.5, 12.0, 12.0), 1.5, 1.5);
+    p.setBrush(raised());
+    p.drawRoundedRect(QRectF(5.0, 1.0, 6.0, 3.5), 1.2, 1.2);
+    p.setPen(iconPen(accent(), 1.2));
+    p.drawLine(QPointF(5.0, 7.5), QPointF(11.0, 7.5));
+    p.drawLine(QPointF(5.0, 10.0), QPointF(10.0, 10.0));
+    p.drawLine(QPointF(5.0, 12.5), QPointF(8.5, 12.5));
     p.end();
     return pm;
 }
@@ -719,9 +690,8 @@ QPixmap drawPaste() {
 
 namespace ToolIcons {
 
-// Every tool icon is now drawn in real paint.net-like colours, so none of them go
-// through themed() — that lightening pass exists only to rescue dark line art and
-// would wash these out.
+// Tool icons retain paint.net's colourful silhouettes; application chrome below
+// uses Omarchy's semantic foreground/accent colours.
 QIcon forTool(ToolType type) {
     switch (type) {
     case ToolType::RectSelection:   return QIcon(drawRectSelect());
@@ -747,14 +717,14 @@ QIcon forTool(ToolType type) {
     }
 }
 
-QIcon newDoc() { return themed(drawNewDoc()); }
-QIcon openDoc() { return themed(drawOpenDoc()); }
-QIcon saveDoc() { return themed(drawSaveDoc()); }
-QIcon undoAction() { return themed(drawUndo()); }
-QIcon redoAction() { return themed(drawRedo()); }
-QIcon cutAction() { return themed(drawCut()); }
-QIcon copyAction() { return themed(drawCopy()); }
-QIcon pasteAction() { return themed(drawPaste()); }
+QIcon newDoc() { return QIcon(drawNewDoc()); }
+QIcon openDoc() { return QIcon(drawOpenDoc()); }
+QIcon saveDoc() { return QIcon(drawSaveDoc()); }
+QIcon undoAction() { return QIcon(drawUndo()); }
+QIcon redoAction() { return QIcon(drawRedo()); }
+QIcon cutAction() { return QIcon(drawCut()); }
+QIcon copyAction() { return QIcon(drawCopy()); }
+QIcon pasteAction() { return QIcon(drawPaste()); }
 
 // ==================== TOOLBAR / MENUBAR EXTRAS (16x16) ====================
 
@@ -762,68 +732,71 @@ QIcon printAction() {
     QPixmap pm = mkpm(TBS);
     QPainter p(&pm);
     aa(p);
-    p.setPen(QPen(QColor(80, 80, 90), 1));
-    p.setBrush(QColor(235, 238, 242));
-    p.drawRect(4, 2, 8, 4);            // paper out top
-    p.setBrush(QColor(120, 130, 145));
-    p.drawRoundedRect(2, 6, 12, 5, 1, 1);  // printer body
-    p.setBrush(Qt::white);
-    p.drawRect(4, 10, 8, 4);           // printed sheet
+    p.setPen(iconPen(ink(), 1.3));
+    p.setBrush(Qt::NoBrush);
+    p.drawRoundedRect(QRectF(2.0, 5.5, 12.0, 6.5), 1.3, 1.3);
+    p.drawRect(QRectF(4.0, 1.5, 8.0, 5.0));
+    p.setBrush(surface());
+    p.drawRect(QRectF(4.0, 9.0, 8.0, 5.5));
+    p.setPen(iconPen(accent(), 1.5));
+    p.drawPoint(QPointF(11.5, 7.8));
     p.end();
-    return themed(pm);
+    return QIcon(pm);
 }
 
 QIcon cropAction() {
     QPixmap pm = mkpm(TBS);
     QPainter p(&pm);
     aa(p);
-    p.setPen(QPen(QColor(60, 60, 70), 1.4));
-    p.drawLine(4, 1, 4, 12);
-    p.drawLine(1, 11, 12, 11);
-    p.setPen(QPen(QColor(60, 60, 70), 1.4, Qt::DashLine));
-    p.drawLine(11, 4, 11, 15);
-    p.drawLine(4, 4, 15, 4);
+    p.setPen(iconPen(ink(), 1.5));
+    p.drawLine(QPointF(4.0, 1.5), QPointF(4.0, 11.8));
+    p.drawLine(QPointF(1.5, 11.5), QPointF(11.8, 11.5));
+    p.setPen(iconPen(accent(), 1.5));
+    p.drawLine(QPointF(11.5, 4.2), QPointF(11.5, 14.5));
+    p.drawLine(QPointF(4.2, 4.5), QPointF(14.5, 4.5));
     p.end();
-    return themed(pm);
+    return QIcon(pm);
 }
 
 QIcon deselectAction() {
     QPixmap pm = mkpm(TBS);
     QPainter p(&pm);
     aa(p);
-    p.setPen(QPen(QColor(110, 110, 120), 1, Qt::DashLine));
+    QPen dashed = iconPen(mutedInk(), 1.1);
+    dashed.setStyle(Qt::DashLine);
+    p.setPen(dashed);
     p.setBrush(Qt::NoBrush);
     p.drawRect(2, 2, 11, 11);
-    p.setPen(QPen(QColor(200, 60, 60), 1.6));
+    p.setPen(iconPen(danger(), 1.7));
     p.drawLine(5, 5, 11, 11);
     p.drawLine(11, 5, 5, 11);
     p.end();
-    return themed(pm);
+    return QIcon(pm);
 }
 
 QIcon pixelGridAction() {
     QPixmap pm = mkpm(TBS);
     QPainter p(&pm);
-    p.setPen(QPen(QColor(110, 120, 135), 1));
+    p.setPen(iconPen(mutedInk(), 1.0));
     for (int i = 1; i <= 13; i += 4) {
         p.drawLine(i, 1, i, 14);
         p.drawLine(1, i, 14, i);
     }
     p.end();
-    return themed(pm);
+    return QIcon(pm);
 }
 
 QIcon rulersAction() {
     QPixmap pm = mkpm(TBS);
     QPainter p(&pm);
     aa(p);
-    p.setPen(QPen(QColor(90, 90, 100), 1));
-    p.setBrush(QColor(250, 244, 200));
-    p.drawRect(1, 5, 14, 6);
-    p.setPen(QPen(QColor(90, 90, 100), 1));
+    p.setPen(iconPen(ink(), 1.2));
+    p.setBrush(surface());
+    p.drawRoundedRect(QRectF(1.5, 5.0, 13.0, 6.0), 1.0, 1.0);
+    p.setPen(iconPen(accent(), 1.0));
     for (int x = 3; x < 15; x += 3) p.drawLine(x, 5, x, 8);
     p.end();
-    return themed(pm);
+    return QIcon(pm);
 }
 
 // ---- Utility-window icons (menu bar, right side) ----
@@ -832,39 +805,39 @@ QIcon toolsWindow() {
     QPixmap pm = mkpm(TBS);
     QPainter p(&pm);
     aa(p);
-    p.setPen(QPen(QColor(70, 120, 185), 1.2));
-    p.setBrush(QColor(70, 120, 185));
+    p.setPen(iconPen(accent(), 1.2));
+    p.setBrush(accent());
     p.drawRect(2, 11, 12, 2);
     p.drawRect(7, 3, 2, 8);
     p.drawRect(5, 2, 6, 2);
     p.end();
-    return themed(pm);
+    return QIcon(pm);
 }
 
 QIcon historyWindow() {
     QPixmap pm = mkpm(TBS);
     QPainter p(&pm);
     aa(p);
-    p.setPen(QPen(QColor(70, 120, 185), 1.4));
+    p.setPen(iconPen(accent(), 1.4));
     p.setBrush(Qt::NoBrush);
     p.drawEllipse(2, 2, 12, 12);
     p.drawLine(8, 4, 8, 8);
     p.drawLine(8, 8, 11, 9);
     p.end();
-    return themed(pm);
+    return QIcon(pm);
 }
 
 QIcon layersWindow() {
     QPixmap pm = mkpm(TBS);
     QPainter p(&pm);
     aa(p);
-    p.setPen(QPen(QColor(70, 120, 185), 1));
-    p.setBrush(QColor(180, 210, 235));
+    p.setPen(iconPen(ink(), 1.1));
+    p.setBrush(raised());
     p.drawRect(3, 3, 9, 6);
-    p.setBrush(QColor(140, 185, 220));
+    p.setBrush(accent());
     p.drawRect(5, 7, 9, 6);
     p.end();
-    return themed(pm);
+    return QIcon(pm);
 }
 
 QIcon colorsWindow() {
@@ -872,53 +845,55 @@ QIcon colorsWindow() {
     QPainter p(&pm);
     aa(p);
     QLinearGradient g(2, 2, 14, 14);
-    g.setColorAt(0.0, QColor(255, 80, 80));
-    g.setColorAt(0.2, QColor(255, 210, 80));
-    g.setColorAt(0.4, QColor(80, 220, 80));
-    g.setColorAt(0.6, QColor(80, 220, 220));
-    g.setColorAt(0.8, QColor(80, 120, 255));
-    g.setColorAt(1.0, QColor(200, 80, 255));
-    p.setPen(QPen(QColor(90, 90, 100), 1));
+    g.setColorAt(0.0, danger());
+    g.setColorAt(0.2, warning());
+    g.setColorAt(0.4, success());
+    g.setColorAt(0.6, cyan());
+    g.setColorAt(0.8, blue());
+    g.setColorAt(1.0, secondary());
+    p.setPen(iconPen(ink(), 1.0));
     p.setBrush(g);
     p.drawEllipse(2, 2, 12, 12);
     p.end();
-    return themed(pm);
+    return QIcon(pm);
 }
 
 QIcon settings() {
     QPixmap pm = mkpm(TBS);
     QPainter p(&pm);
     aa(p);
-    p.setPen(QPen(QColor(90, 95, 105), 1.3));
-    p.setBrush(QColor(200, 206, 214));
+    p.setPen(iconPen(ink(), 1.3));
+    p.setBrush(raised());
     // simple gear: circle + teeth
     p.drawEllipse(4, 4, 8, 8);
-    p.setPen(QPen(QColor(90, 95, 105), 1.6));
+    p.setPen(iconPen(ink(), 1.6));
     for (int a = 0; a < 360; a += 45) {
         double r = a * M_PI / 180.0;
         p.drawLine(QPointF(8 + 5.0 * cos(r), 8 + 5.0 * sin(r)),
                    QPointF(8 + 7.0 * cos(r), 8 + 7.0 * sin(r)));
     }
-    p.setBrush(Qt::white);
-    p.setPen(QPen(QColor(90, 95, 105), 1));
+    p.setBrush(surface());
+    p.setPen(iconPen(accent(), 1.1));
     p.drawEllipse(6, 6, 4, 4);
     p.end();
-    return themed(pm);
+    return QIcon(pm);
 }
 
 QIcon help() {
     QPixmap pm = mkpm(TBS);
     QPainter p(&pm);
     aa(p);
-    p.setPen(QPen(QColor(70, 120, 185), 1.3));
-    p.setBrush(QColor(225, 238, 250));
+    p.setPen(iconPen(accent(), 1.4));
+    p.setBrush(surface());
     p.drawEllipse(1, 1, 14, 14);
-    QFont f("Sans", 9, QFont::Bold);
+    QFont f = Theme::uiFont();
+    f.setPixelSize(10);
+    f.setBold(true);
     p.setFont(f);
-    p.setPen(QColor(40, 90, 160));
+    p.setPen(accent());
     p.drawText(QRect(1, 1, 14, 14), Qt::AlignCenter, "?");
     p.end();
-    return themed(pm);
+    return QIcon(pm);
 }
 
 } // namespace ToolIcons

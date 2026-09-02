@@ -18,6 +18,8 @@
 #include "tools/tool.h"
 
 class QMenu;
+class QFileSystemWatcher;
+class QTimer;
 class Document;
 class CanvasWidget;
 class LayersPanel;
@@ -25,6 +27,7 @@ class ColorsPanel;
 class HistoryPanel;
 class ToolOptionsPanel;
 class PluginManager;
+namespace DesktopIntegration { class TextScaleMonitor; }
 class PluginEffect;
 
 class MainWindow : public QMainWindow {
@@ -167,6 +170,11 @@ private:
     void layoutToolsPalette(bool horizontal);
     // Applies the current colour scheme (light / dark / follow-OS) everywhere.
     void applyTheme();
+    // Omarchy atomically replaces its active theme directory, so watch the file
+    // and its parent directories and re-arm the watcher after every change.
+    void setupThemeWatcher();
+    void refreshThemeWatcher();
+    void refreshIcons();
     // Rebuilds all text-carrying chrome after a language change.
     void retranslateUi();
 
@@ -235,6 +243,8 @@ private:
     QLabel *m_positionLabel = nullptr;
     QLabel *m_zoomLabel = nullptr;
     QLabel *m_toolLabel = nullptr;
+    QLabel *m_sizeIcon = nullptr;
+    QLabel *m_positionIcon = nullptr;
 
     // Actions
     QAction *m_undoAction = nullptr;
@@ -244,6 +254,9 @@ private:
     bool m_normalizingDockLayout = false;
     bool m_restoringState = false;
     bool m_minimized = false;
+    QFileSystemWatcher *m_themeWatcher = nullptr;
+    QTimer *m_themeReloadTimer = nullptr;
+    DesktopIntegration::TextScaleMonitor *m_textScaleMonitor = nullptr;
     // Top-level windows hidden with the app. Not always the QDockWidget itself:
     // Qt wraps grouped panels in a QDockWidgetGroupWindow, which owns the window.
     QVector<QPointer<QWidget>> m_hiddenOnMinimize;

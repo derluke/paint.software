@@ -13,9 +13,12 @@
 int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
     app.setApplicationName("paint.software");
+    app.setDesktopFileName(QStringLiteral("paint.software"));
     app.setApplicationVersion(QStringLiteral(PAINTSW_VERSION_STR));
     app.setOrganizationName("PaintDali");
-    app.setWindowIcon(QIcon(":/paintdali-logo.png"));
+    app.setOrganizationDomain(QStringLiteral("github.com/Univers4craft"));
+    app.setWindowIcon(QIcon::fromTheme(QStringLiteral("paint.software"),
+                                       QIcon(QStringLiteral(":/paintdali-logo.svg"))));
 
     // Restore the saved language / colour scheme before any UI is built.
     I18n::loadFromSettings();

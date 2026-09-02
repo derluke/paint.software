@@ -42,6 +42,8 @@ maintainer's final approval (see [Contributing](#-contributing--en)).
   handle to **stretch, squash or shrink the selected artwork** like Paint.NET
 - **Non-destructive history** with click-to-navigate undo/redo, plus autosave / crash recovery
 - **UI in English & French** (English by default, switch in Options), light & dark themes matching Paint.NET
+- **Omarchy / Hyprland integration** — follows the active Omarchy palette live and keeps utility panels
+  in one compositor-friendly window by default
 - **Multi-document**, rulers (px / inches / cm), and infinite canvas
 
 ### 🤔 Why paint.software? (a Paint.NET alternative for Linux)
@@ -177,6 +179,8 @@ fusionnée après **mon approbation finale** en tant que mainteneur (voir [Contr
   seul, ou attrapez une poignée pour **étirer, aplatir ou rétrécir le contenu sélectionné** comme Paint.NET
 - **Historique non destructif** avec navigation au clic, plus sauvegarde auto / récupération après plantage
 - **Interface en anglais & français** (anglais par défaut, changeable dans Options), thèmes clair & sombre calqués sur Paint.NET
+- **Intégration Omarchy / Hyprland** — suit la palette Omarchy active en direct et conserve les panneaux
+  dans une seule fenêtre adaptée au compositeur par défaut
 - **Multi-documents**, règles (px / pouces / cm) et canevas infini
 
 ### 🤔 Pourquoi paint.software ? (une alternative à Paint.NET pour Linux)

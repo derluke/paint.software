@@ -1,5 +1,6 @@
 #include "canvaswidget.h"
 #include "core/document.h"
+#include "theme.h"
 #include "tools/tool.h"
 #include <QPainter>
 #include <QMouseEvent>
@@ -86,6 +87,10 @@ bool CanvasWidget::showRulers() const {
     return m_showRulers;
 }
 
+int CanvasWidget::rulerSize() const {
+    return m_showRulers ? Theme::scaledMetric(20) : 0;
+}
+
 void CanvasWidget::zoomIn() {
     double newZoom = m_zoom;
     if (m_zoom < 1.0) newZoom = m_zoom * 1.5;
@@ -106,7 +111,7 @@ void CanvasWidget::zoomOut() {
 
 void CanvasWidget::zoomToFit() {
     if (!m_document) return;
-    int rs = m_showRulers ? 20 : 0;
+    const int rs = rulerSize();
     double zx = (double)(width() - 20 - rs) / m_document->width();
     double zy = (double)(height() - 20 - rs) / m_document->height();
     setZoom(std::min(zx, zy));
@@ -119,7 +124,7 @@ void CanvasWidget::zoomToFit() {
 
 void CanvasWidget::zoomToRect(const QRect &canvasRect) {
     if (!m_document || canvasRect.isEmpty()) return;
-    const int rs = m_showRulers ? 20 : 0;
+    const int rs = rulerSize();
     const double margin = 24.0;
     const double zx = (width() - rs - margin * 2) / canvasRect.width();
     const double zy = (height() - rs - margin * 2) / canvasRect.height();
@@ -136,7 +141,7 @@ void CanvasWidget::zoomToRect(const QRect &canvasRect) {
 void CanvasWidget::zoomToActual() {
     setZoom(1.0);
     if (m_document) {
-        int rs = m_showRulers ? 20 : 0;
+        const int rs = rulerSize();
         m_pan = QPointF(
             (width() - rs - m_document->width()) / 2.0,
             (height() - rs - m_document->height()) / 2.0
@@ -154,7 +159,7 @@ void CanvasWidget::centerView() {
     // No margin clamp here: it would push a snugly-fitting image off-centre, and
     // an image larger than the viewport is better centred (overflowing evenly)
     // than pinned to the left.
-    const int rs = m_showRulers ? 20 : 0;
+    const int rs = rulerSize();
     const qreal imgW = m_document->width() * m_zoom;
     const qreal imgH = m_document->height() * m_zoom;
     m_pan = QPointF((width() - rs - imgW) / 2.0, (height() - rs - imgH) / 2.0);
@@ -164,7 +169,7 @@ void CanvasWidget::centerView() {
 void CanvasWidget::resetToDefaultView() {
     if (!m_document) return;
 
-    const int rs = m_showRulers ? 20 : 0;
+    const int rs = rulerSize();
     const qreal margin = 40.0;
     const qreal availableWidth = std::max(1.0, width() - rs - margin * 2.0);
     const qreal availableHeight = std::max(1.0, height() - rs - margin * 2.0);
@@ -176,12 +181,12 @@ void CanvasWidget::resetToDefaultView() {
 }
 
 QPointF CanvasWidget::widgetToCanvas(const QPointF &widgetPos) const {
-    int rs = m_showRulers ? 20 : 0;
+    const int rs = rulerSize();
     return (widgetPos - QPointF(rs, rs) - m_pan) / m_zoom;
 }
 
 QPointF CanvasWidget::canvasToWidget(const QPointF &canvasPos) const {
-    int rs = m_showRulers ? 20 : 0;
+    const int rs = rulerSize();
     return canvasPos * m_zoom + m_pan + QPointF(rs, rs);
 }
 
@@ -200,7 +205,7 @@ void CanvasWidget::paintEvent(QPaintEvent *) {
     if (!m_document) return;
 
     // Ruler offset
-    int rs = m_showRulers ? 20 : 0;
+    const int rs = rulerSize();
 
     // Canvas area
     QRectF canvasRect(m_pan.x() + rs, m_pan.y() + rs,
@@ -249,16 +254,19 @@ void CanvasWidget::paintEvent(QPaintEvent *) {
 
     // Rulers (drawn on top of everything, like Paint.NET)
     if (m_showRulers && m_document) {
-        const int rulerSize = 20;
-        QFont rulerFont("Sans", 7);
+        const int rulerSize = this->rulerSize();
+        QFont rulerFont = Theme::uiFont();
+        rulerFont.setPixelSize(Theme::scaledMetric(9));
         painter.setFont(rulerFont);
 
-        // Theme-aware colours: light strip on light backdrop, dark on dark.
-        const bool dark = m_backdrop.lightness() < 110;
-        const QColor rulerBg   = dark ? QColor(58, 58, 58)   : QColor(255, 255, 255);
-        const QColor rulerLine = dark ? QColor(90, 90, 90)   : QColor(180, 180, 180);
-        const QColor tickCol   = dark ? QColor(190, 190, 190) : QColor(100, 100, 100);
-        const QColor textCol   = dark ? QColor(220, 220, 220) : QColor(60, 60, 60);
+        // The ruler is application chrome, not image content: draw it entirely
+        // from the active semantic palette. Accent majors and a warm cursor
+        // marker add useful hierarchy without turning every tick into noise.
+        const QColor rulerBg   = Theme::color(Theme::ColorRole::Background);
+        const QColor rulerLine = Theme::color(Theme::ColorRole::Selection);
+        const QColor minorTick = Theme::color(Theme::ColorRole::Muted);
+        const QColor majorTick = Theme::color(Theme::ColorRole::Accent);
+        const QColor textCol   = Theme::color(Theme::ColorRole::SubtleForeground);
 
         // Backgrounds
         painter.fillRect(QRect(rulerSize, 0, width() - rulerSize, rulerSize), rulerBg);
@@ -306,18 +314,18 @@ void CanvasWidget::paintEvent(QPaintEvent *) {
             return std::abs(v / step - std::round(v / step)) < 1e-6;
         };
 
-        painter.setPen(QPen(tickCol, 1));
+        painter.setPen(QPen(minorTick, 1));
         const double startX = std::floor(leftU / smallStep) * smallStep;
         for (double u = startX; u <= rightU + smallStep; u += smallStep) {
             const double wx = unitToWx(u);
             if (wx < rulerSize || wx > width()) continue;
             if (isMultiple(u, majorStep)) {
-                painter.setPen(QPen(tickCol, 1));
+                painter.setPen(QPen(majorTick, 1));
                 painter.drawLine(QPointF(wx, 0), QPointF(wx, rulerSize));
                 painter.setPen(textCol);
                 painter.drawText(QPointF(wx + 2, rulerSize - 4), fmt(u));
             } else {
-                painter.setPen(QPen(tickCol, 1));
+                painter.setPen(QPen(minorTick, 1));
                 painter.drawLine(QPointF(wx, rulerSize * 0.7), QPointF(wx, rulerSize));
             }
         }
@@ -327,7 +335,7 @@ void CanvasWidget::paintEvent(QPaintEvent *) {
             const double wy = unitToWy(u);
             if (wy < rulerSize || wy > height()) continue;
             if (isMultiple(u, majorStep)) {
-                painter.setPen(QPen(tickCol, 1));
+                painter.setPen(QPen(majorTick, 1));
                 painter.drawLine(QPointF(0, wy), QPointF(rulerSize, wy));
                 painter.setPen(textCol);
                 painter.save();
@@ -336,13 +344,15 @@ void CanvasWidget::paintEvent(QPaintEvent *) {
                 painter.drawText(0, 0, fmt(u));
                 painter.restore();
             } else {
-                painter.setPen(QPen(tickCol, 1));
+                painter.setPen(QPen(minorTick, 1));
                 painter.drawLine(QPointF(rulerSize * 0.7, wy), QPointF(rulerSize, wy));
             }
         }
 
         // Cursor position indicator on the rulers.
-        painter.setPen(QPen(QColor(255, 60, 60, 200), 1));
+        QColor cursorColor = Theme::color(Theme::ColorRole::Warning);
+        cursorColor.setAlpha(230);
+        painter.setPen(QPen(cursorColor, 1));
         QPoint cursorPos = mapFromGlobal(QCursor::pos());
         if (cursorPos.x() >= rulerSize && cursorPos.x() < width())
             painter.drawLine(cursorPos.x(), 0, cursorPos.x(), rulerSize);
@@ -388,7 +398,7 @@ void CanvasWidget::drawSelectionMarching(QPainter &painter) {
     if (region.isEmpty()) return;
 
     painter.save();
-    int rs = m_showRulers ? 20 : 0;
+    const int rs = rulerSize();
     painter.translate(m_pan + QPointF(rs, rs));
     painter.scale(m_zoom, m_zoom);
 

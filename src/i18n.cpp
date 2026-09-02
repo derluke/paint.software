@@ -330,7 +330,7 @@ const QHash<QString, QString> &table() {
         {"Thème :", "Color Scheme:"},
         {"Clair", "Light"},
         {"Sombre", "Dark"},
-        {"Défaut (système)", "Default (system)"},
+        {"Défaut (système / Omarchy)", "Default (system / Omarchy)"},
         {"Français", "French"},
         {"Anglais", "English"},
         {"Luminosité du damier de transparence :", "Transparency checkerboard brightness:"},

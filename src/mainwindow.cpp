@@ -2,6 +2,7 @@
 #include "toolicons.h"
 #include "i18n.h"
 #include "theme.h"
+#include "desktopintegration.h"
 #include "core/document.h"
 #include "canvas/canvaswidget.h"
 #include "panels/layerspanel.h"
@@ -112,6 +113,7 @@
 #include <QFileInfo>
 #include <QSizePolicy>
 #include <QTimer>
+#include <QFileSystemWatcher>
 #include <QSettings>
 #include <QCursor>
 #include <QMenu>
@@ -226,8 +228,18 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     });
     updateTitle();
 
+    // Follow the same desktop-wide text scale as Omawrite/Omacalc. Portal reads
+    // are asynchronous, so a slow or absent backend never delays the window.
+    m_textScaleMonitor = new DesktopIntegration::TextScaleMonitor(this);
+    Theme::setDesktopTextScale(m_textScaleMonitor->textScale());
+    connect(m_textScaleMonitor, &DesktopIntegration::TextScaleMonitor::textScaleChanged,
+            this, [this](qreal scale) {
+        if (Theme::setDesktopTextScale(scale)) applyTheme();
+    });
+
     // Apply the current colour scheme (light / dark / follow-OS).
     applyTheme();
+    setupThemeWatcher();
 
     // Keep the floating utility windows in sync with the app's minimise state
     // (some WMs don't send a WindowStateChange event on external minimise).
@@ -729,7 +741,35 @@ void MainWindow::applyTheme() {
     // Application-wide, not just this window: file dialogs and other pop-ups are
     // separate top-level widgets, and with only the main window styled their item
     // views kept a white background under light text (issue #7).
+    qApp->setFont(Theme::uiFont());
+    qApp->setPalette(Theme::palette());
     qApp->setStyleSheet(Theme::styleSheet());
+
+    const int toolbarIcon = Theme::scaledMetric(16);
+    const int toolIcon = Theme::scaledMetric(20);
+    if (m_fixedToolbar) m_fixedToolbar->setIconSize(QSize(toolbarIcon, toolbarIcon));
+    if (m_variableToolbar) {
+        const int optionIcon = Theme::scaledMetric(14);
+        m_variableToolbar->setIconSize(QSize(optionIcon, optionIcon));
+    }
+    for (QToolButton *button : m_toolButtons) {
+        if (!button) continue;
+        button->setIconSize(QSize(toolIcon, toolIcon));
+        button->setFixedHeight(Theme::scaledMetric(28));
+        button->setMinimumWidth(Theme::scaledMetric(28));
+    }
+    if (m_toolsDock) {
+        const Qt::DockWidgetArea area = dockWidgetArea(m_toolsDock);
+        layoutToolsPalette(area == Qt::TopDockWidgetArea
+                           || area == Qt::BottomDockWidgetArea);
+    }
+    if (QWidget *corner = menuBar()->cornerWidget(Qt::TopRightCorner)) {
+        for (QToolButton *button : corner->findChildren<QToolButton*>())
+            button->setIconSize(QSize(toolbarIcon, toolbarIcon));
+    }
+    if (m_sizeIcon) m_sizeIcon->setFixedWidth(Theme::scaledMetric(14));
+    if (m_positionIcon) m_positionIcon->setFixedWidth(Theme::scaledMetric(14));
+
     if (m_canvas) {
         m_canvas->setBackdropColor(QColor(Theme::canvasBackdrop()));
         m_canvas->update();
@@ -738,9 +778,133 @@ void MainWindow::applyTheme() {
     for (QDockWidget *dock : {m_toolsDock, m_historyDock, m_layersDock, m_colorsDock}) {
         if (dock) dock->setStyleSheet(Theme::styleSheet());
     }
-    // The reset/swap icons are painted pixmaps, so a stylesheet can't recolour
-    // them: redraw them for the new scheme.
+    // Painted pixmaps cannot recolour themselves when Omarchy changes theme.
+    refreshIcons();
+}
+
+void MainWindow::refreshIcons() {
+    for (QToolButton *button : m_toolButtons) {
+        if (!button) continue;
+        button->setIcon(ToolIcons::forTool(
+            static_cast<ToolType>(button->property("toolTypeInt").toInt())));
+    }
+
+    if (m_fixedToolbar) {
+        const QList<QIcon> icons = {
+            ToolIcons::newDoc(), ToolIcons::openDoc(), ToolIcons::saveDoc(),
+            ToolIcons::printAction(), ToolIcons::cutAction(), ToolIcons::copyAction(),
+            ToolIcons::pasteAction(), ToolIcons::cropAction(), ToolIcons::deselectAction(),
+            ToolIcons::undoAction(), ToolIcons::redoAction(),
+            ToolIcons::pixelGridAction(), ToolIcons::rulersAction(),
+        };
+        int iconIndex = 0;
+        for (QAction *action : m_fixedToolbar->actions()) {
+            if (!action || action->isSeparator()) continue;
+            if (iconIndex < icons.size()) action->setIcon(icons.at(iconIndex++));
+        }
+    }
+
+    if (QWidget *corner = menuBar()->cornerWidget(Qt::TopRightCorner)) {
+        for (QToolButton *button : corner->findChildren<QToolButton*>()) {
+            const QString key = button->property("paintIcon").toString();
+            if (key == "tools") button->setIcon(ToolIcons::toolsWindow());
+            else if (key == "history") button->setIcon(ToolIcons::historyWindow());
+            else if (key == "layers") button->setIcon(ToolIcons::layersWindow());
+            else if (key == "colors") button->setIcon(ToolIcons::colorsWindow());
+            else if (key == "settings") button->setIcon(ToolIcons::settings());
+            else if (key == "help") button->setIcon(ToolIcons::help());
+        }
+    }
+
+    if (m_sizeIcon) {
+        QPixmap pm = Theme::iconCanvas(12);
+        QPainter painter(&pm);
+        painter.setRenderHint(QPainter::Antialiasing, true);
+        painter.setPen(QPen(Theme::color(Theme::ColorRole::SubtleForeground), 1.1));
+        painter.drawRect(QRectF(1.0, 1.0, 10.0, 10.0));
+        painter.setPen(QPen(Theme::color(Theme::ColorRole::Accent), 1.0));
+        painter.drawLine(QPointF(1.0, 6.0), QPointF(11.0, 6.0));
+        painter.drawLine(QPointF(6.0, 1.0), QPointF(6.0, 11.0));
+        m_sizeIcon->setPixmap(pm);
+    }
+    if (m_positionIcon) {
+        QPixmap pm = Theme::iconCanvas(12);
+        QPainter painter(&pm);
+        painter.setRenderHint(QPainter::Antialiasing, true);
+        painter.setPen(QPen(Theme::color(Theme::ColorRole::SubtleForeground), 1.0));
+        painter.drawLine(QPointF(6.0, 0.8), QPointF(6.0, 11.2));
+        painter.drawLine(QPointF(0.8, 6.0), QPointF(11.2, 6.0));
+        painter.setPen(QPen(Theme::color(Theme::ColorRole::Accent), 1.2));
+        painter.drawEllipse(QRectF(3.0, 3.0, 6.0, 6.0));
+        m_positionIcon->setPixmap(pm);
+    }
+
+    if (m_layersPanel) m_layersPanel->refreshIcons();
+    if (m_historyPanel) m_historyPanel->refreshIcons();
     if (m_colorsPanel) m_colorsPanel->refreshIcons();
+}
+
+void MainWindow::setupThemeWatcher() {
+    m_themeWatcher = new QFileSystemWatcher(this);
+    m_themeReloadTimer = new QTimer(this);
+    m_themeReloadTimer->setSingleShot(true);
+    m_themeReloadTimer->setInterval(120);
+
+    auto scheduleReload = [this]() {
+        if (m_themeReloadTimer) m_themeReloadTimer->start();
+    };
+    connect(m_themeWatcher, &QFileSystemWatcher::fileChanged,
+            this, [scheduleReload](const QString &) { scheduleReload(); });
+    connect(m_themeWatcher, &QFileSystemWatcher::directoryChanged,
+            this, [scheduleReload](const QString &) { scheduleReload(); });
+    connect(m_themeReloadTimer, &QTimer::timeout, this, [this]() {
+        const bool changed = Theme::reloadExternalPalette();
+        refreshThemeWatcher();
+        if (changed && Theme::scheme() == Theme::Scheme::Default) applyTheme();
+    });
+    refreshThemeWatcher();
+}
+
+void MainWindow::refreshThemeWatcher() {
+    if (!m_themeWatcher) return;
+    const QStringList oldPaths = m_themeWatcher->files() + m_themeWatcher->directories();
+    if (!oldPaths.isEmpty()) m_themeWatcher->removePaths(oldPaths);
+
+    const QFileInfo paletteFile(Theme::omarchyPalettePath());
+    QStringList paths;
+    if (paletteFile.exists() && paletteFile.isFile())
+        paths.append(paletteFile.absoluteFilePath());
+
+    // Omarchy swaps current/theme as a directory. Watching several existing
+    // ancestors keeps the reload signal alive across that atomic replacement.
+    QDir directory = paletteFile.absoluteDir();
+    for (int depth = 0; depth < 3; ++depth) {
+        const QString path = directory.absolutePath();
+        if (QFileInfo(path).isDir() && !paths.contains(path)) paths.append(path);
+        if (!directory.cdUp()) break;
+    }
+
+    QString configHome = qEnvironmentVariable("XDG_CONFIG_HOME").trimmed();
+    if (configHome.isEmpty()) configHome = QDir::home().filePath(QStringLiteral(".config"));
+    const QDir fontConfigDir(QDir(configHome).filePath(QStringLiteral("fontconfig")));
+    if (fontConfigDir.exists() && !paths.contains(fontConfigDir.absolutePath()))
+        paths.append(fontConfigDir.absolutePath());
+    const QString fontConfigFile = fontConfigDir.filePath(QStringLiteral("fonts.conf"));
+    if (QFileInfo::exists(fontConfigFile) && !paths.contains(fontConfigFile))
+        paths.append(fontConfigFile);
+
+    // Machine-level Omarchy shell overrides include the global text size.
+    // Watch the parent even before shell.toml exists so its first creation is
+    // observed, then the file itself for subsequent atomic replacements.
+    const QFileInfo userShell(Theme::omarchyUserShellPath());
+    const QString userShellDir = userShell.absolutePath();
+    if (QFileInfo(userShellDir).isDir() && !paths.contains(userShellDir))
+        paths.append(userShellDir);
+    if (userShell.exists() && userShell.isFile()
+        && !paths.contains(userShell.absoluteFilePath())) {
+        paths.append(userShell.absoluteFilePath());
+    }
+    if (!paths.isEmpty()) m_themeWatcher->addPaths(paths);
 }
 
 void MainWindow::retranslateUi() {
@@ -804,10 +968,12 @@ void MainWindow::createMenuBarCornerIcons() {
 
     // Helper: a checkable toggle button bound to a dock, with an F-key shortcut.
     // The tooltip spells out what the window is for and how to reset it.
-    auto addDockToggle = [&](QDockWidget *dock, const QIcon &icon, const QString &label,
+    auto addDockToggle = [&](QDockWidget *dock, const QIcon &icon, const QString &iconKey,
+                             const QString &label,
                              const QString &key, const QString &what) {
         auto *btn = new QToolButton(corner);
         btn->setIcon(icon);
+        btn->setProperty("paintIcon", iconKey);
         btn->setIconSize(QSize(16, 16));
         btn->setCheckable(true);
         btn->setChecked(dock->isVisible());
@@ -822,7 +988,7 @@ void MainWindow::createMenuBarCornerIcons() {
             "QToolButton { background: transparent; border: none;"
             " border-bottom: 2px solid transparent; border-radius: 3px; padding: 2px 2px 0 2px; }"
             "QToolButton:hover { background: rgba(127,127,127,0.28); }"
-            "QToolButton:checked { background: transparent; border-bottom: 2px solid #4a90d9; }");
+            "QToolButton:checked { background: transparent; border-bottom: 2px solid palette(highlight); }");
         connect(btn, &QToolButton::clicked, this, [dock](bool on) { dock->setVisible(on); });
         connect(dock, &QDockWidget::visibilityChanged, btn, &QToolButton::setChecked);
 
@@ -841,18 +1007,19 @@ void MainWindow::createMenuBarCornerIcons() {
         return btn;
     };
 
-    addDockToggle(m_toolsDock, ToolIcons::toolsWindow(), "Outils", "F5",
+    addDockToggle(m_toolsDock, ToolIcons::toolsWindow(), "tools", "Outils", "F5",
                   "Affiche ou masque la palette d'outils (pinceau, sélection, formes...).");
-    addDockToggle(m_historyDock, ToolIcons::historyWindow(), "Historique", "F6",
+    addDockToggle(m_historyDock, ToolIcons::historyWindow(), "history", "Historique", "F6",
                   "Affiche ou masque l'historique : chaque action est listée, cliquez pour y revenir.");
-    addDockToggle(m_layersDock, ToolIcons::layersWindow(), "Calques", "F7",
+    addDockToggle(m_layersDock, ToolIcons::layersWindow(), "layers", "Calques", "F7",
                   "Affiche ou masque les calques : ajouter, supprimer, réordonner, opacité et fusion.");
-    addDockToggle(m_colorsDock, ToolIcons::colorsWindow(), "Couleurs", "F8",
+    addDockToggle(m_colorsDock, ToolIcons::colorsWindow(), "colors", "Couleurs", "F8",
                   "Affiche ou masque les couleurs : couleur primaire/secondaire, roue, RVB/TSV et palette.");
 
     // Settings
     auto *settingsBtn = new QToolButton(corner);
     settingsBtn->setIcon(ToolIcons::settings());
+    settingsBtn->setProperty("paintIcon", "settings");
     settingsBtn->setIconSize(QSize(16, 16));
     settingsBtn->setAutoRaise(true);
     settingsBtn->setToolTip(QString("<b>%1</b><br>%2")
@@ -864,6 +1031,7 @@ void MainWindow::createMenuBarCornerIcons() {
     // Help
     auto *helpBtn = new QToolButton(corner);
     helpBtn->setIcon(ToolIcons::help());
+    helpBtn->setProperty("paintIcon", "help");
     helpBtn->setIconSize(QSize(16, 16));
     helpBtn->setAutoRaise(true);
     helpBtn->setToolTip(QString("<b>%1</b><br>%2")
@@ -891,6 +1059,23 @@ void MainWindow::resetUtilityWindow(QDockWidget *dock) {
     // right edge — the paint.net default arrangement.
     if (!dock || !m_canvas) return;
     dock->setVisible(true);
+
+    // Hyprland tiles each floating QDockWidget as a separate application window.
+    // Resetting a panel there means restoring it to the useful one-window layout.
+    if (DesktopIntegration::prefersDockedUtilityWindows()) {
+        const bool left = dock == m_toolsDock || dock == m_colorsDock;
+        addDockWidget(left ? Qt::LeftDockWidgetArea : Qt::RightDockWidgetArea, dock);
+        if (left && m_toolsDock && m_colorsDock
+            && !m_toolsDock->isFloating() && !m_colorsDock->isFloating()) {
+            splitDockWidget(m_toolsDock, m_colorsDock, Qt::Vertical);
+        } else if (!left && m_historyDock && m_layersDock
+                   && !m_historyDock->isFloating() && !m_layersDock->isFloating()) {
+            splitDockWidget(m_historyDock, m_layersDock, Qt::Vertical);
+        }
+        normalizeDockLayout(dock);
+        return;
+    }
+
     // Only float it if it is currently docked into the main window. When Qt has
     // wrapped it in a QDockWidgetGroupWindow it is already its own window, and
     // calling setFloating() would tear it out — leaving the emptied group window
@@ -1389,7 +1574,7 @@ void MainWindow::layoutToolsPalette(bool horizontal) {
         // One row hugging the top: kill the vertical margins and pin the height to
         // the icon row so the dock has no empty band above/below.
         m_toolsGrid->setContentsMargins(1, 0, 1, 0);
-        const int rowH = 28;   // button height
+        const int rowH = Theme::scaledMetric(28);   // button height
         m_toolsPaletteWidget->setMinimumWidth(0);
         m_toolsPaletteWidget->setMaximumWidth(QWIDGETSIZE_MAX);
         m_toolsPaletteWidget->setMinimumHeight(rowH);
@@ -1405,8 +1590,8 @@ void MainWindow::layoutToolsPalette(bool horizontal) {
         m_toolsGrid->setContentsMargins(1, 2, 1, 2);
         m_toolsPaletteWidget->setMinimumHeight(0);
         m_toolsPaletteWidget->setMaximumHeight(QWIDGETSIZE_MAX);
-        m_toolsPaletteWidget->setMinimumWidth(28 * 2 + 2);
-        m_toolsPaletteWidget->setMaximumWidth(200);
+        m_toolsPaletteWidget->setMinimumWidth(Theme::scaledMetric(28) * 2 + 2);
+        m_toolsPaletteWidget->setMaximumWidth(Theme::scaledMetric(200));
         if (m_toolsDock) m_toolsDock->setMinimumSize(0, 0);
         m_toolsGrid->setColumnStretch(0, 1);
         m_toolsGrid->setColumnStretch(1, 1);
@@ -1471,87 +1656,74 @@ void MainWindow::createDockPanels() {
         normalizeDockLayout(m_layersDock);
     });
 
-    m_toolsDock->setFloating(true);
-    m_historyDock->setFloating(true);
-    m_layersDock->setFloating(true);
-    m_colorsDock->setFloating(true);
-
-    m_toolsDock->resize(62, 520);
-    m_historyDock->resize(260, 200);
-    m_layersDock->resize(260, 220);
-    m_colorsDock->resize(220, 320);
-
-    QTimer::singleShot(0, this, [this]() {
-        QSettings settings("PaintDali", "PaintDali");
-        if (settings.contains("ui/mainWindowStateV2")) {
-            // A saved layout exists; do not overwrite it with default startup positions.
-            return;
-        }
-
-        const QRect g = geometry();
-        m_toolsDock->move(g.left() + 6, g.top() + 115);
-        m_historyDock->move(g.right() - m_historyDock->width() - 10, g.top() + 115);
-        m_layersDock->move(g.right() - m_layersDock->width() - 10, g.bottom() - m_layersDock->height() - 40);
-        m_colorsDock->move(g.left() + 6, g.bottom() - m_colorsDock->height() - 40);
-        normalizeDockLayout(m_toolsDock);
-        normalizeDockLayout(m_historyDock);
-        normalizeDockLayout(m_layersDock);
+    if (DesktopIntegration::prefersDockedUtilityWindows()) {
+        // One compositor toplevel: Tools/Colors down the left, History/Layers
+        // down the right. restoreState(), called just after construction, still
+        // wins when the user has arranged and saved a custom layout.
+        splitDockWidget(m_toolsDock, m_colorsDock, Qt::Vertical);
+        splitDockWidget(m_historyDock, m_layersDock, Qt::Vertical);
+        resizeDocks({m_toolsDock, m_colorsDock}, {230, 270}, Qt::Vertical);
+        resizeDocks({m_historyDock, m_layersDock}, {220, 280}, Qt::Vertical);
+        resizeDocks({m_toolsDock, m_historyDock}, {210, 250}, Qt::Horizontal);
         normalizeDockLayout(m_colorsDock);
-    });
+        normalizeDockLayout(m_layersDock);
+    } else {
+        m_toolsDock->setFloating(true);
+        m_historyDock->setFloating(true);
+        m_layersDock->setFloating(true);
+        m_colorsDock->setFloating(true);
+
+        m_toolsDock->resize(62, 520);
+        m_historyDock->resize(260, 200);
+        m_layersDock->resize(260, 220);
+        m_colorsDock->resize(220, 320);
+
+        QTimer::singleShot(0, this, [this]() {
+            QSettings settings("PaintDali", "PaintDali");
+            if (settings.contains("ui/mainWindowStateV7")) {
+                // A saved layout exists; do not overwrite it with default startup positions.
+                return;
+            }
+
+            const QRect g = geometry();
+            m_toolsDock->move(g.left() + 6, g.top() + 115);
+            m_historyDock->move(g.right() - m_historyDock->width() - 10, g.top() + 115);
+            m_layersDock->move(g.right() - m_layersDock->width() - 10, g.bottom() - m_layersDock->height() - 40);
+            m_colorsDock->move(g.left() + 6, g.bottom() - m_colorsDock->height() - 40);
+            normalizeDockLayout(m_toolsDock);
+            normalizeDockLayout(m_historyDock);
+            normalizeDockLayout(m_layersDock);
+            normalizeDockLayout(m_colorsDock);
+        });
+    }
 }
 
 void MainWindow::createStatusBar() {
     // Active tool name on the far left.
     m_toolLabel = new QLabel("Pinceau");
-    m_toolLabel->setStyleSheet("font-size: 11px; font-weight: bold; padding-left: 4px; padding-right: 6px;");
+    m_toolLabel->setStyleSheet("font-weight: bold; padding-left: 4px; padding-right: 6px;");
     statusBar()->addWidget(m_toolLabel);
 
     // Help text on the left (like Paint.NET)
     m_helpTextLabel = new QLabel(TR("Clic gauche pour dessiner avec la couleur primaire, clic droit avec la couleur secondaire."));
-    m_helpTextLabel->setStyleSheet("font-size: 11px; padding-left: 4px;");
+    m_helpTextLabel->setStyleSheet("padding-left: 4px;");
 
-    // Size icon (drawn grid icon) + dimensions
-    auto *sizeIcon = new QLabel;
-    {
-        QPixmap pm(12, 12);
-        pm.fill(Qt::transparent);
-        QPainter p(&pm);
-        p.setPen(QPen(QColor(100, 100, 100), 1));
-        p.drawRect(1, 1, 10, 10);
-        p.drawLine(1, 6, 11, 6);
-        p.drawLine(6, 1, 6, 11);
-        p.end();
-        sizeIcon->setPixmap(pm);
-    }
-    sizeIcon->setFixedWidth(14);
+    // Size icon (drawn by refreshIcons so it follows theme and screen density).
+    m_sizeIcon = new QLabel;
+    m_sizeIcon->setFixedWidth(14);
     m_sizeLabel = new QLabel("800 × 600");
-    m_sizeLabel->setStyleSheet("font-size: 11px;");
 
-    // Cursor position icon (drawn crosshair) + coords
-    auto *cursorIcon = new QLabel;
-    {
-        QPixmap pm(12, 12);
-        pm.fill(Qt::transparent);
-        QPainter p(&pm);
-        p.setRenderHint(QPainter::Antialiasing, true);
-        p.setPen(QPen(QColor(100, 100, 100), 1));
-        p.drawLine(6, 1, 6, 11);
-        p.drawLine(1, 6, 11, 6);
-        p.drawEllipse(3, 3, 6, 6);
-        p.end();
-        cursorIcon->setPixmap(pm);
-    }
-    cursorIcon->setFixedWidth(14);
+    // Cursor position icon (also refreshed with the semantic palette).
+    m_positionIcon = new QLabel;
+    m_positionIcon->setFixedWidth(14);
     m_positionLabel = new QLabel("0, 0");
-    m_positionLabel->setStyleSheet("font-size: 11px;");
 
     // "px" unit label
     auto *pxLabel = new QLabel("px");
-    pxLabel->setStyleSheet("font-size: 11px; color: #666;");
+    pxLabel->setStyleSheet("color: palette(mid);");
 
     // Zoom percentage
     m_zoomLabel = new QLabel("100%");
-    m_zoomLabel->setStyleSheet("font-size: 11px;");
     m_zoomLabel->setFixedWidth(42);
 
     // Paint.NET-like zoom controls on the right: [-] [slider] [+]
@@ -1609,9 +1781,9 @@ void MainWindow::createStatusBar() {
     });
 
     statusBar()->addWidget(m_helpTextLabel, 1);
-    statusBar()->addPermanentWidget(sizeIcon);
+    statusBar()->addPermanentWidget(m_sizeIcon);
     statusBar()->addPermanentWidget(m_sizeLabel);
-    statusBar()->addPermanentWidget(cursorIcon);
+    statusBar()->addPermanentWidget(m_positionIcon);
     statusBar()->addPermanentWidget(m_positionLabel);
     statusBar()->addPermanentWidget(pxLabel);
     statusBar()->addPermanentWidget(m_zoomLabel);

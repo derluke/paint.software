@@ -7,7 +7,7 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Widgets Core Gui PrintSupport)
+find_package(Qt6 REQUIRED COMPONENTS Widgets Core Gui PrintSupport DBus)
 
 # Single source of truth for the version shown to users. CI passes
 # -DPAINTSW_VERSION=<major.minor.commitcount>; a local build falls back to the
@@ -139,6 +139,7 @@ set(MAIN_SOURCES
     src/toolicons.cpp
     src/i18n.cpp
     src/theme.cpp
+    src/desktopintegration.cpp
     src/dockdropoverlay.cpp
 )
 
@@ -170,6 +171,7 @@ target_link_libraries(paintdotnet PRIVATE
     Qt6::PrintSupport
     Qt6::Core
     Qt6::Gui
+    Qt6::DBus
 )
 
 target_compile_definitions(paintdotnet PRIVATE PAINTSW_VERSION_STR="${PAINTSW_VERSION_STR}")
@@ -189,6 +191,7 @@ set(NONMAIN_SOURCES
     src/toolicons.cpp
     src/i18n.cpp
     src/theme.cpp
+    src/desktopintegration.cpp
     ${RESOURCES}
 )
 
@@ -198,7 +201,7 @@ add_executable(paintdotnet_tests EXCLUDE_FROM_ALL
 )
 target_include_directories(paintdotnet_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(paintdotnet_tests PRIVATE
-    Qt6::Widgets Qt6::PrintSupport Qt6::Core Qt6::Gui)
+    Qt6::Widgets Qt6::PrintSupport Qt6::Core Qt6::Gui Qt6::DBus)
 
 # ---- Sample plugin (demonstrates the C ABI; built into build/plugins) ----
 # A MODULE library is a shared object meant to be dlopen'd, never linked against.
@@ -217,6 +220,8 @@ install(FILES packaging/io.github.univers4craft.PaintSoftware.metainfo.xml
         DESTINATION share/metainfo)
 install(FILES src/resources/paintdali-logo.png
         DESTINATION share/pixmaps RENAME paint.software.png)
+install(FILES src/resources/paintdali-logo.svg
+        DESTINATION share/icons/hicolor/scalable/apps RENAME paint.software.svg)
 # Ship the sample plugin as a system plugin so a fresh install has a working example
 # (loaded from /usr/lib/paint.software/plugins).
 install(TARGETS sample_sepia_plugin LIBRARY DESTINATION lib/paint.software/plugins)

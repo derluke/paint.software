@@ -57,7 +57,7 @@ void ColorWheelWidget::paintEvent(QPaintEvent *) {
     painter.drawImage(0, 0, m_wheelImage);
 
     // Rim
-    painter.setPen(QPen(QColor(120, 120, 120), 1));
+    painter.setPen(QPen(Theme::color(Theme::ColorRole::Muted), 1));
     painter.setBrush(Qt::NoBrush);
     painter.drawEllipse(QPoint(cx, cy), m_wheelRadius, m_wheelRadius);
 
@@ -201,7 +201,7 @@ ColorsPanel::ColorsPanel(QWidget *parent) : QWidget(parent) {
     // Secondary swatch: smaller, behind and offset
     m_secondarySwatch = new QLabel(swatchContainer);
     m_secondarySwatch->setGeometry(16, 16, 32, 32);
-    m_secondarySwatch->setStyleSheet("background-color: white; border: 2px solid #808080;");
+    m_secondarySwatch->setStyleSheet("background-color: white; border: 2px solid palette(mid);");
     m_secondarySwatch->setCursor(Qt::PointingHandCursor);
     m_secondarySwatch->installEventFilter(this);
     // Raise primary on top
@@ -250,7 +250,7 @@ ColorsPanel::ColorsPanel(QWidget *parent) : QWidget(parent) {
     sliderGrid->setSpacing(1);
     // RVB header
     auto *rvbHeader = new QLabel(TR("RVB"));
-    rvbHeader->setStyleSheet("font-weight: bold; font-size: 10px; color: #555;");
+    rvbHeader->setStyleSheet("font-weight: bold; color: palette(mid);");
     sliderGrid->addWidget(rvbHeader, 0, 0, 1, 3);
     auto makeSlider = [&](const QString &label, int row, QSlider *&slider, QSpinBox *&spin) {
         auto *lbl = new QLabel(label);
@@ -286,7 +286,7 @@ ColorsPanel::ColorsPanel(QWidget *parent) : QWidget(parent) {
 
     // HSV header label
     auto *hsvHeader = new QLabel(TR("TSV"));
-    hsvHeader->setStyleSheet("font-weight: bold; font-size: 10px; color: #555;");
+    hsvHeader->setStyleSheet("font-weight: bold; color: palette(mid);");
     hsvGrid->addWidget(hsvHeader, 0, 0, 1, 3);
 
     auto makeHsvSlider = [&](const QString &label, int row, int maxVal, QSlider *&slider, QSpinBox *&spin) {
@@ -499,12 +499,16 @@ void ColorsPanel::updateFromDocument() {
     QColor secondary = m_document->secondaryColor();
 
     // The active slot gets a bright outline; the inactive one a muted one.
+    const QString accentBorder = QStringLiteral("3px solid %1")
+        .arg(Theme::color(Theme::ColorRole::Accent).name());
+    const QString mutedBorder = QStringLiteral("2px solid %1")
+        .arg(Theme::color(Theme::ColorRole::Muted).name());
     m_primarySwatch->setStyleSheet(
         QString("background-color: %1; border: %2;")
-            .arg(primary.name(), m_editingPrimary ? "3px solid #4a90d9" : "2px solid gray"));
+            .arg(primary.name(), m_editingPrimary ? accentBorder : mutedBorder));
     m_secondarySwatch->setStyleSheet(
         QString("background-color: %1; border: %2;")
-            .arg(secondary.name(), m_editingPrimary ? "2px solid gray" : "3px solid #4a90d9"));
+            .arg(secondary.name(), m_editingPrimary ? mutedBorder : accentBorder));
     // Whichever slot is active is drawn in front.
     if (m_editingPrimary) m_primarySwatch->raise();
     else                  m_secondarySwatch->raise();
@@ -566,17 +570,17 @@ void ColorsPanel::updateHsvSliders(const QColor &color) {
 void ColorsPanel::refreshIcons() {
     // Both icons used to be drawn in a fixed dark grey — the same colour as the
     // dark scheme's panel, so they were invisible. Follow the active scheme.
-    const QColor fg = Theme::isDark() ? QColor(225, 225, 225) : QColor(60, 60, 60);
+    const QColor resetColor = Theme::color(Theme::ColorRole::Accent);
+    const QColor swapColor = Theme::color(Theme::ColorRole::Secondary);
 
     if (m_resetBtn) {
-        QPixmap pm(14, 14);
-        pm.fill(Qt::transparent);
+        QPixmap pm = Theme::iconCanvas(14);
         QPainter rp(&pm);
         rp.setRenderHint(QPainter::Antialiasing, true);
-        rp.setPen(QPen(fg, 1.5));
+        rp.setPen(QPen(resetColor, 1.5));
         rp.setBrush(Qt::NoBrush);
         rp.drawArc(QRect(2, 2, 10, 10), 45 * 16, 270 * 16);
-        rp.setBrush(fg);
+        rp.setBrush(resetColor);
         rp.setPen(Qt::NoPen);
         QPointF a[] = {QPointF(7, 1), QPointF(4, 3.5), QPointF(7, 6)};
         rp.drawPolygon(a, 3);
@@ -586,11 +590,10 @@ void ColorsPanel::refreshIcons() {
     }
 
     if (m_swapBtn) {
-        QPixmap pm(14, 14);
-        pm.fill(Qt::transparent);
+        QPixmap pm = Theme::iconCanvas(14);
         QPainter sp(&pm);
         sp.setRenderHint(QPainter::Antialiasing, true);
-        sp.setPen(QPen(fg, 1.3));
+        sp.setPen(QPen(swapColor, 1.3));
         sp.drawLine(3, 4, 11, 4);
         sp.drawLine(9, 2, 11, 4); sp.drawLine(9, 6, 11, 4);
         sp.drawLine(3, 10, 11, 10);
@@ -714,7 +717,7 @@ void ColorsPanel::rebuildSwatchGrid() {
         // The stylesheet sizes the *content* box, so the 1px border and any
         // padding are added on top: state both, or each cell silently ends up
         // half again as wide as asked and the whole panel bloats.
-        btn->setStyleSheet(QString("QToolButton { background-color: %1; border: 1px solid #888;"
+        btn->setStyleSheet(QString("QToolButton { background-color: %1; border: 1px solid palette(mid);"
                                    " padding: 0px; margin: 0px;"
                                    " min-width: %2px; min-height: %2px;"
                                    " max-width: %2px; max-height: %2px; }")
