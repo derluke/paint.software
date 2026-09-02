@@ -1,16 +1,18 @@
 <div align="center">
   <img src="src/resources/paintdali-logo.png" alt="paint.software logo" width="96" height="96">
   <h1>paint.software</h1>
-  <p><strong>An open-source clone of Paint.NET for Linux — built with C++ &amp; Qt6.</strong></p>
+  <p><strong>A fast, native Paint.NET-style image editor for Linux — built with C++17 &amp; Qt 6.</strong></p>
 
-  [![CI build](https://github.com/Univers4craft/paint.software/actions/workflows/ci.yml/badge.svg)](https://github.com/Univers4craft/paint.software/actions/workflows/ci.yml)
+  [![CI build](https://github.com/derluke/paint.software/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/derluke/paint.software/actions/workflows/ci.yml)
   [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
   [![C++17](https://img.shields.io/badge/C%2B%2B-17-00599C.svg)](CMakeLists.txt)
   [![Qt6](https://img.shields.io/badge/Qt-6-41CD52.svg)](https://www.qt.io/)
+
+  <p><strong>Native Linux · No Wine · No .NET runtime · Omarchy / Hyprland aware</strong></p>
 </div>
 
 <div align="center">
-  <img src="docs/screenshot.png" alt="paint.software running on Linux — a Paint.NET-style image editor: dark theme, tool palette, colour wheel with the Paint.NET palette, layers and history panels" width="900">
+  <img src="docs/screenshot.png" alt="paint.software running natively on Omarchy with the Tokyo Night theme, docked tools, colours, history and layers panels" width="900">
 </div>
 
 > **Keywords:** paint.net clone · paint.net for Linux · paint dot net alternative · open-source image editor · photo editor · raster graphics editor · Qt6 · C++
@@ -23,6 +25,9 @@
 [**Paint.NET**](https://www.getpaint.net/) on Linux. It aims to be a familiar, lightweight
 **Paint.NET alternative** with layers, blend modes, selections, effects and adjustments — all native,
 with no .NET runtime required.
+
+This fork builds on [Univers4craft's original project](https://github.com/Univers4craft/paint.software)
+with a first-class Omarchy and Hyprland experience while remaining portable to other Linux desktops.
 
 Anyone is welcome to **use it, build it, and improve it.** Every change is reviewed and merged with the
 maintainer's final approval (see [Contributing](#-contributing--en)).
@@ -41,10 +46,32 @@ maintainer's final approval (see [Contributing](#-contributing--en)).
 - **Selections** with feather / grow / shrink and confined editing — move the marquee alone, or grab a
   handle to **stretch, squash or shrink the selected artwork** like Paint.NET
 - **Non-destructive history** with click-to-navigate undo/redo, plus autosave / crash recovery
-- **UI in English & French** (English by default, switch in Options), light & dark themes matching Paint.NET
-- **Omarchy / Hyprland integration** — follows the active Omarchy palette live and keeps utility panels
-  in one compositor-friendly window by default
+- **UI in English & French** (English by default, switch in Options), plus native English file dialogs
+- **Live Omarchy theming** — follows semantic colours, the global font and text size, with themed rulers,
+  widgets, tool icons and HiDPI rendering
+- **Paint.NET or current-theme colour palettes** — switch from the familiar classic swatches to useful
+  shades derived from the active Omarchy theme
+- **Hyprland-native layout and launcher** — utility panels dock into one compositor-friendly window by
+  default, with the correct application identity and scalable desktop icon
 - **Multi-document**, rulers (px / inches / cm), and infinite canvas
+
+### 🎨 Omarchy & Hyprland
+
+With **Default (system / Omarchy)** selected in Options, paint.software discovers Omarchy's active
+`colors.toml` automatically. Theme changes are applied live to the application palette, canvas surround,
+rulers and custom-drawn icons. The app also follows Omarchy's global font family and text size from cold
+start, so it feels at home alongside lightweight native apps such as Omawrite and Omacalc.
+
+The **Palette** menu lets you keep the traditional Paint.NET swatches or use colours derived from the
+current desktop theme. On Hyprland, the Tools, Colours, History and Layers panels stay docked by default;
+other Linux desktops retain the familiar floating-panel option. Omarchy is an integration, not a runtime
+dependency — without it, paint.software falls back to its normal system, light or dark theme.
+
+<div align="center">
+  <img src="docs/omarchy-theme-palette.png" alt="Theme-derived paint palette and Omarchy-coloured rulers and tool icons in paint.software" width="760">
+  <br>
+  <sub>Tokyo Night colours and the Omarchy global font, applied to the editor and paint palette.</sub>
+</div>
 
 ### 🤔 Why paint.software? (a Paint.NET alternative for Linux)
 If you miss **Paint.NET on Linux**, paint.software gives you the same simple, layer-based
@@ -54,6 +81,9 @@ is **fully open source** (MIT) and builds from source on any distro. A native
 **Paint.NET clone / Pinta-style editor** for Ubuntu, Linux Mint, Debian, Fedora and friends.
 
 ### 📦 Install (Debian / Ubuntu / Linux Mint)
+
+> The packaged releases below are produced by the upstream project. The Omarchy integration shown above
+> currently lives on this fork's `main` branch; use [Build from source](#-build-from-source) to try it now.
 
 > **Requires Qt 6.4 or newer** — Ubuntu 24.04+, Debian 12+, Linux Mint 22+, LMDE 6+.
 > Ubuntu 22.04 and Linux Mint 21 ship Qt 6.2 and cannot install this package.
@@ -96,7 +126,8 @@ flatpak run io.github.univers4craft.PaintSoftware
 Or [build from source](#-build-from-source) — it works on any distribution.
 
 ### 🛠️ Build from source
-Requirements: a C++17 compiler, **CMake ≥ 3.16**, and **Qt 6** (Widgets, Gui, Core, PrintSupport).
+Requirements: a C++17 compiler, **CMake ≥ 3.16**, and **Qt 6**
+(Widgets, Gui, Core, PrintSupport and DBus).
 
 ```bash
 # Debian / Ubuntu / Linux Mint
@@ -109,16 +140,22 @@ sudo dnf install gcc-c++ cmake qt6-qtbase-devel mesa-libGL-devel
 sudo pacman -S base-devel cmake qt6-base
 
 # Other distros: install a C++ compiler, CMake, and the Qt 6 base
-# development package (it provides Widgets, Gui, Core and PrintSupport).
+# development package (it provides Widgets, Gui, Core, PrintSupport and DBus).
 
 # Then, on any distro:
-git clone https://github.com/Univers4craft/paint.software.git
+git clone https://github.com/derluke/paint.software.git
 cd paint.software
 cmake -B build
 cmake --build build -j
 
 # Run
 ./build/paintdotnet
+```
+
+To install the application, scalable icon and desktop launcher for your user account:
+
+```bash
+cmake --install build --prefix "$HOME/.local"
 ```
 
 Building from source works on **any** Linux distribution — the `.deb` and APT
@@ -160,6 +197,10 @@ l'apparence et le fonctionnement de [**Paint.NET**](https://www.getpaint.net/) s
 d'offrir une **alternative à Paint.NET** légère et familière, avec calques, modes de fusion, sélections,
 effets et ajustements — le tout natif, sans runtime .NET.
 
+Ce fork s'appuie sur le [projet original de Univers4craft](https://github.com/Univers4craft/paint.software)
+et lui ajoute une intégration complète à Omarchy et Hyprland, tout en restant portable vers les autres
+bureaux Linux.
+
 Tout le monde est invité à **l'utiliser, le compiler et l'améliorer.** Chaque modification est relue et
 fusionnée après **mon approbation finale** en tant que mainteneur (voir [Contribuer](#-contribuer--fr)).
 
@@ -178,10 +219,34 @@ fusionnée après **mon approbation finale** en tant que mainteneur (voir [Contr
 - **Sélections** avec adoucissement / dilatation / contraction et édition confinée — déplacez le contour
   seul, ou attrapez une poignée pour **étirer, aplatir ou rétrécir le contenu sélectionné** comme Paint.NET
 - **Historique non destructif** avec navigation au clic, plus sauvegarde auto / récupération après plantage
-- **Interface en anglais & français** (anglais par défaut, changeable dans Options), thèmes clair & sombre calqués sur Paint.NET
-- **Intégration Omarchy / Hyprland** — suit la palette Omarchy active en direct et conserve les panneaux
-  dans une seule fenêtre adaptée au compositeur par défaut
+- **Interface en anglais & français** (anglais par défaut, changeable dans Options), avec dialogues de
+  fichiers natifs et libellés traduits
+- **Thème Omarchy en direct** — suit les couleurs sémantiques, la police globale et la taille du texte,
+  avec règles, widgets et icônes d'outils adaptés au thème et au HiDPI
+- **Palette Paint.NET ou palette du thème actuel** — gardez les nuances classiques ou utilisez des
+  couleurs utiles dérivées du thème Omarchy actif
+- **Disposition et lanceur natifs pour Hyprland** — les panneaux restent intégrés dans une seule fenêtre
+  adaptée au compositeur, avec la bonne identité d'application et une icône vectorielle
 - **Multi-documents**, règles (px / pouces / cm) et canevas infini
+
+### 🎨 Omarchy & Hyprland
+
+Lorsque **Défaut (système / Omarchy)** est sélectionné dans Options, paint.software détecte
+automatiquement le fichier `colors.toml` du thème Omarchy actif. Les changements de thème sont appliqués
+en direct à la palette de l'application, au pourtour du canevas, aux règles et aux icônes dessinées sur
+mesure. Dès le démarrage, l'application suit aussi la police globale et la taille de texte d'Omarchy, pour
+s'intégrer naturellement aux applications natives légères comme Omawrite et Omacalc.
+
+Le menu **Palette** permet de conserver les nuances traditionnelles de Paint.NET ou d'utiliser celles
+dérivées du thème du bureau. Sous Hyprland, les panneaux Outils, Couleurs, Historique et Calques restent
+intégrés par défaut ; les autres bureaux Linux conservent l'option de panneaux flottants. Omarchy est une
+intégration, pas une dépendance : en son absence, paint.software revient à son thème système, clair ou sombre.
+
+<div align="center">
+  <img src="docs/omarchy-theme-palette.png" alt="Palette de peinture dérivée du thème, règles et icônes aux couleurs d'Omarchy dans paint.software" width="760">
+  <br>
+  <sub>Les couleurs Tokyo Night et la police globale d'Omarchy appliquées à l'éditeur et à la palette.</sub>
+</div>
 
 ### 🤔 Pourquoi paint.software ? (une alternative à Paint.NET pour Linux)
 Si **Paint.NET vous manque sous Linux**, paint.software offre le même flux de travail simple à base
@@ -191,6 +256,10 @@ ou Krita pour les retouches rapides, il garde la disposition familière de Paint
 Un **clone de Paint.NET / éditeur façon Pinta** natif pour Ubuntu, Linux Mint, Debian, Fedora et compagnie.
 
 ### 📦 Installer (Debian / Ubuntu / Linux Mint)
+
+> Les paquets ci-dessous sont produits par le projet d'origine. L'intégration Omarchy présentée ci-dessus
+> se trouve actuellement sur la branche `main` de ce fork ; suivez [Compiler depuis les sources](#-compiler-depuis-les-sources)
+> pour l'essayer dès maintenant.
 
 > **Nécessite Qt 6.4 ou plus récent** — Ubuntu 24.04+, Debian 12+, Linux Mint 22+, LMDE 6+.
 > Ubuntu 22.04 et Linux Mint 21 fournissent Qt 6.2 et ne peuvent pas installer ce paquet.
@@ -234,7 +303,8 @@ flatpak run io.github.univers4craft.PaintSoftware
 Ou [compilez depuis les sources](#-compiler-depuis-les-sources) — ça marche sur toute distribution.
 
 ### 🛠️ Compiler depuis les sources
-Prérequis : un compilateur C++17, **CMake ≥ 3.16** et **Qt 6** (Widgets, Gui, Core, PrintSupport).
+Prérequis : un compilateur C++17, **CMake ≥ 3.16** et **Qt 6**
+(Widgets, Gui, Core, PrintSupport et DBus).
 
 ```bash
 # Debian / Ubuntu / Linux Mint
@@ -247,16 +317,22 @@ sudo dnf install gcc-c++ cmake qt6-qtbase-devel mesa-libGL-devel
 sudo pacman -S base-devel cmake qt6-base
 
 # Autres distributions : installez un compilateur C++, CMake et le paquet
-# de développement Qt 6 « base » (il fournit Widgets, Gui, Core et PrintSupport).
+# de développement Qt 6 « base » (il fournit Widgets, Gui, Core, PrintSupport et DBus).
 
 # Puis, sur n'importe quelle distribution :
-git clone https://github.com/Univers4craft/paint.software.git
+git clone https://github.com/derluke/paint.software.git
 cd paint.software
 cmake -B build
 cmake --build build -j
 
 # Lancer
 ./build/paintdotnet
+```
+
+Pour installer l'application, son icône vectorielle et son lanceur de bureau dans votre compte utilisateur :
+
+```bash
+cmake --install build --prefix "$HOME/.local"
 ```
 
 La compilation depuis les sources fonctionne sur **toute** distribution Linux — le
